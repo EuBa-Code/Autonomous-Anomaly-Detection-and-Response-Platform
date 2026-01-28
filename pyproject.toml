@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "matplotlib",
+    "numpy>=2.4.1",
+    "pandas>=3.0.0",
     "plotly>=6.5.2",
     "pyarrow>=19.0.1",
     "sdv>=1.32.1",
