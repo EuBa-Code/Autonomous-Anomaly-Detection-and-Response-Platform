@@ -14,3 +14,10 @@ wheels/
 
 # Personal files
 ImportantThings.txt
+
+# Parquet Files
+*.parquet
+
+# Folders
+historical_data/
+streaming_data/
