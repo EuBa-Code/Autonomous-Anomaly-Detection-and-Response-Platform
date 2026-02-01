@@ -29,25 +29,30 @@ def start_streaming():
         print(f"Error loading file: {e}")
         return
 
-    print(f"📡 Simulation started. Records: {len(df)}")
+    print(f"📡 Simulation started. Total records: {len(df)}")
 
-    for _, row in df.iterrows():
-        # 1. Prepare data
-        data = row.to_dict()
-        payload = json.dumps(data, default=str).encode('utf-8')
+    batch_size = 5  # Number of washing machines (messages) sent per batch
 
-        # 2. Produce (Asynchronous)
-        producer.produce(
-            Config.TOPIC_TELEMETRY, 
-            value=payload, 
-            callback=delivery_report
-        )
+    for i in range(0, len(df), batch_size):
+        # Take a group of 5 rows
+        chunk = df.iloc[i : i + batch_size]
 
-        # 3. Flush & Sleep
-        producer.flush() # Forces the message out immediately
-        print(f"Waiting 1s before next record...") # remember to change it to 30 sec!!
-        time.sleep(1)
+        for _, row in chunk.iterrows():
+            data = row.to_dict()
+            payload = json.dumps(data, default=str).encode("utf-8")
 
+            # Send messages (they are buffered by Kafka almost instantly)
+            producer.produce(
+                Config.TOPIC_TELEMETRY,
+                value=payload,
+                callback=delivery_report
+            )
+
+        # Flush the buffer and send everything now
+        producer.flush()
+
+        print(f"🚀 Sent a batch of {len(chunk)} messages. Waiting 5 seconds...")
+        time.sleep(5)
 
 if __name__ == "__main__":
     start_streaming()

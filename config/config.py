@@ -28,11 +28,11 @@ class Config:
 
     # --- 4. File Paths ---
     # The source file for your Producer (Simulation)
-    STREAMING_DATASET = STREAMING_DIR / os.getenv('STREAMING_DATASET_NAME', 'synthetic_data_sdv.parquet')
+    STREAMING_DATASET = STREAMING_DIR / os.getenv('STREAMING_DATASET', 'streaming_data.parquet')
     
     # Paths for synthetic data generation
     INPUT_DATA_PATH = SYNTHETIC_DIR / "test_data.csv"
-    SYNTHETIC_OUTPUT_PATH = SYNTHETIC_DIR / "synthetic_data_sdv.parquet"
+    SYNTHETIC_OUTPUT_PATH = SYNTHETIC_DIR / "synthetic_data.parquet"
 
     # --- 5. Machine Learning Features ---
     TARGET = os.getenv('TARGET_COLUMN', 'Is_Anomaly')
