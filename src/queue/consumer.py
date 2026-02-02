@@ -1,5 +1,6 @@
 """
-Corrected Kafka consumer with flexible telemetry data model
+RedPanda consumer with flexible telemetry data model
+(RedPanda is Kafka API compatible, so the code remains the same)
 """
 import json
 import pandas as pd
@@ -47,13 +48,15 @@ class TelemetryData(BaseModel):
         extra = "allow"
 
 # ------------------------------
-# Kafka consumer setup
+# RedPanda consumer setup (uses Kafka API)
 # ------------------------------
 def get_consumer() -> Consumer:
-    """Create a Kafka consumer to read telemetry messages."""
+    """Create a RedPanda consumer to read telemetry messages."""
     conf = {
-        'bootstrap.servers': Config.KAFKA_SERVER,
+        'bootstrap.servers': Config.KAFKA_SERVER,  
         'group.id': 'anomaly-detector-v1',
-        'auto.offset.reset': 'earliest'
+        'auto.offset.reset': 'earliest',
+        'enable.auto.commit': True,
+        'auto.commit.interval.ms': 5000
     }
     return Consumer(conf)

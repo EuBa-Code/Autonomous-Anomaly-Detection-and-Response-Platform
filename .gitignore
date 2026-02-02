@@ -24,3 +24,6 @@ streaming_data/
 
 # Kafka
 kafka_storage/
+
+# RedPanda
+redpanda_storage/

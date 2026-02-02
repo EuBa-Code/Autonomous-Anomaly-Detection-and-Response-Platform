@@ -1,3 +1,7 @@
+"""
+Anomaly Detection App using RedPanda
+(RedPanda is Kafka API compatible, so the code remains the same)
+"""
 import json
 import pandas as pd
 import joblib  # Standard library for loading AI models
@@ -12,13 +16,14 @@ from pydantic import ValidationError
 def run_anomaly_detection():
     consumer = get_consumer()
     consumer.subscribe([Config.TOPIC_TELEMETRY])
-    print(f"🧠 Anomaly Detector (App) running on {Config.TOPIC_TELEMETRY}...\n")
+    print(f"🧠 Anomaly Detector running on RedPanda topic: {Config.TOPIC_TELEMETRY}...\n")
 
     try:
         while True:
-            # Get Message from Kafka
+            # Get Message from RedPanda
             msg = consumer.poll(1.0)
-            if msg is None: continue
+            if msg is None: 
+                continue
             if msg.error():
                 print(f"❌ Error: {msg.error()}")
                 continue
@@ -26,7 +31,7 @@ def run_anomaly_detection():
             # Decode & Validate (Pydantic)
             try:
                 data_dict = json.loads(msg.value().decode('utf-8'))
-                telemetry = TelemetryData(**data_dict) # This validates types automatically
+                telemetry = TelemetryData(**data_dict)  # This validates types automatically
             except (json.JSONDecodeError, ValidationError) as e:
                 print(f"⚠️ Bad Data: {e}")
                 continue
@@ -62,9 +67,10 @@ def run_anomaly_detection():
 
 
     except KeyboardInterrupt:
-        print("Stopping app...")
+        print("\n🛑 Stopping anomaly detector...")
     finally:
         consumer.close()
+        print("✅ Consumer closed gracefully")
 
 if __name__ == "__main__":
     run_anomaly_detection()

@@ -12,7 +12,7 @@ class Config:
     
     # --- 2. Kafka Settings ---
     # Matches the 'KAFKA_ADVERTISED_LISTENERS' in your compose.yaml
-    KAFKA_SERVER = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+    KAFKA_SERVER = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:19092')
     TOPIC_TELEMETRY = os.getenv('TOPIC_TELEMETRY', 'telemetry-data')
     CONSUMER_GROUP = os.getenv('KAFKA_CONSUMER_GROUP', 'anomaly-detector-v1')
 
