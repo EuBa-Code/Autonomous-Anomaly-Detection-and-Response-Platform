@@ -74,6 +74,3 @@ def run_streaming_preprocessing():
 
     logger.info("Streaming Preprocessing Pipeline (Scaling + OHE) started...")
     app.run(sdf)
-
-if __name__ == "__main__":
-    run_streaming_preprocessing()

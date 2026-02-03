@@ -111,26 +111,33 @@ class DataPreprocessor:
         
         return result
 
+    def transform(self, data: pd.DataFrame) -> np.ndarray:
+        """
+        Wrapper method for compatibility with the streaming script.
+        Returns a numpy array instead of a DataFrame.
+        """
+        # Calls the existing logic with fit=False
+        df_scaled = self.preprocess_data(data, fit=False)
+        # Returns the raw values as a numpy array (required by in_feature_engineering.py)
+        return df_scaled.values
+
     def save_scaler(self, filepath: Path):
         """
-        Saves the scaler for future use (e.g., on test dataset)
-        without refitting and without recomputing feature columns.
+        Saves the ENTIRE CLASS INSTANCE, not just the dictionary.
+        This allows the streaming script to use the .transform() methods.
         """
         try:
-            # Ensure the directory exists
             filepath = Path(filepath)
             filepath.parent.mkdir(parents=True, exist_ok=True)
 
-            # Save both scaler and feature_columns
-            scaler_data = {
-                'scaler': self.scaler,
-                'feature_columns': self.feature_columns
-            }
-            joblib.dump(scaler_data, filepath)
-            logger.info(f"Scaler and feature columns saved to {filepath}")
+            # CHANGE: Save 'self' (the whole object), not a dictionary
+            joblib.dump(self, filepath)
+            
+            logger.info(f"Preprocessor object saved to {filepath}")
         except Exception as e:
             logger.error(f"Error saving scaler: {e}")
-            raise  # re-raise original error, program stops and logs trace
+            raise
+
 
     def load_scaler(self, filepath: Path):
         """
