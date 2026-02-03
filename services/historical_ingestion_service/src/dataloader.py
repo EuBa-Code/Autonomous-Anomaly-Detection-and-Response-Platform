@@ -4,7 +4,6 @@ from typing import Optional, List
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import pandas as pd
-import joblib
 
 logger=logging.getLogger(__name__)  # logger associated with the current module/file
 
