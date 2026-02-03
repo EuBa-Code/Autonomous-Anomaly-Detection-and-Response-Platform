@@ -10,7 +10,7 @@ import pandas as pd
 from config import IsolationForestConfig
 
 from validation import ConfigValidator
-from services.historical_ingestion_service.src import DataLoader
+from src.dataloader import DataLoader
 from model import IsolationForestModel
 from metrics import MetricsCalculator
 
@@ -43,7 +43,7 @@ class TrainingPipeline:
         self.model_dir = model_dir
         self.metrics_dir = metrics_dir
 
-        self.data_loader = DataLoader(data_dir)
+        self.data_loader = DataLoader(data_dir) ############ Using the unedited historical data
         self.model = None
         self.validator = ConfigValidator(data_dir, model_dir, metrics_dir)
         self.metrics_calculator = MetricsCalculator()
