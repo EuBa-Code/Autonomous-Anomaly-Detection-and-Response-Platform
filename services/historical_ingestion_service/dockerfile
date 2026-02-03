@@ -3,8 +3,12 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 WORKDIR /hist_ingestion
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
 
-COPY services/hist_ingestion/src ./src/
+RUN uv sync --frozen --no-dev --group hist_ingestion
 
-CMD ["uv", "run", "src/generate_preprocessor.py"]
+COPY services/historical_ingestion_service/src ./src/
+COPY services/historical_ingestion_service/config ./config/
+
+ENV PYTHONPATH=/hist_ingestion/src:$PYTHONPATH
+
+CMD ["uv", "run", "python", "src/generate_preprocessor.py"]

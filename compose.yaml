@@ -55,12 +55,10 @@ services:
   hist_ingestion:
     build: 
       context: .
-      dockerfile: services/hist_ingestion/Dockerfile
+      dockerfile: services/historical_ingestion_service/Dockerfile
     environment:
       - APP_HOME=/hist_ingestion           
-      - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092 
     volumes:
-      - ./config:/hist_ingestion/config
       - ./data:/hist_ingestion/data         
-      - ./models:/hist_ingestion/data/models 
-      - ./metrics:/hist_ingestion/data/metrics
+      - ./models:/hist_ingestion/models 
+      - ./metrics:/hist_ingestion/metrics

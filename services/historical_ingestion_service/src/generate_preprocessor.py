@@ -3,31 +3,41 @@ import logging
 import joblib
 import pandas as pd
 from pathlib import Path
-from config import IsolationForestConfig
+import sys
+from config.config import RAW_DATA_PATH, OUTPUT_PATH 
 
-# Import your classes from your project files
-from services.historical_ingestion_service.src import DataLoader, DataPreprocessor
+# Add the src directory to the path
+sys.path.insert(0, str(Path(__file__).parent))
+
+# Import your classes - fixed import paths
+from dataloader import DataLoader
+from hist_feature_engineering import DataPreprocessor
 
 # Basic logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ArtifactGenerator")
 
-RAW_DATA_PATH = Path(IsolationForestConfig.TRAIN_PATH)  
-OUTPUT_PATH = Path("models/preprocessor.joblib")
-
+# Use relative paths from the container working directory
 def generate():
     # 1. Load data
     logger.info("Loading data...")
-    # DataLoader handles reading CSV/Parquet files
-
+    
     # ---- Loading the Historical data
     loader = DataLoader(data_dir=RAW_DATA_PATH)
     try:
         # Try loading parquet files first
+        logger.info("Attempting to load parquet files...")
         df = loader.load_data(filename="*.parquet")
-    except:
+    except Exception as e:
+        logger.warning(f"Parquet loading failed: {e}. Trying CSV...")
         # Fallback to CSV if parquet fails
-        df = loader.load_data(filename="*.csv")
+        try:
+            df = loader.load_data(filename="*.csv")
+        except Exception as e2:
+            logger.error(f"Failed to load data: {e2}")
+            raise
+
+    logger.info(f"Data loaded successfully: {len(df)} rows, {len(df.columns)} columns")
 
     # 2. Initialize the Preprocessor
     # Define columns to EXCLUDE from scaling (ID, timestamp, label)
@@ -44,8 +54,14 @@ def generate():
 
     # 4. Save preprocessor
     logger.info(f"Saving to {OUTPUT_PATH}...")
-    # We use the modified save_scaler method from before
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     preprocessor.save_scaler(OUTPUT_PATH)
     
-    logger.info("✅ Done! You can now start streaming.")
+    logger.info("✅ Done! Preprocessor saved successfully.")
 
+if __name__ == "__main__":
+    try:
+        generate()
+    except Exception as e:
+        logger.error(f"Error in preprocessor generation: {e}", exc_info=True)
+        sys.exit(1)
