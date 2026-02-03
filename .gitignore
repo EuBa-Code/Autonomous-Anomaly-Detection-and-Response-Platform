@@ -33,3 +33,10 @@ training.log
 
 # testing
 test_predictions.csv
+
+# Documentation (Internal)
+PROJECT_ARCHITECTURE.md
+
+# Airflow
+airflow_db/
+airflow_logs/
