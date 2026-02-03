@@ -29,6 +29,7 @@ hist_ingestion = [
 
 training_ml = [
     "numpy>=2.4.1",
+    "pyarrow>=19.0.1",
     "scikit-learn>=1.8.0",
 ]
 

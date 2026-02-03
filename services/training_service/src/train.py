@@ -1,274 +1,434 @@
 """
-Main module for training the Isolation Forest model
+Training pipeline for Isolation Forest anomaly detection model.
+
+This module orchestrates the complete training workflow:
+1. Load preprocessor artifact (created by Historical Ingestion Service)
+2. Load and preprocess training data
+3. Train Isolation Forest model
+4. Evaluate on test data
+5. Save model artifacts and metrics
 """
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 import pandas as pd
+import joblib
 
-from config import IsolationForestConfig
-
-from validation import ConfigValidator
-from src.dataloader import DataLoader
+from config import config
+from dataloader import DataLoader
 from model import IsolationForestModel
 from metrics import MetricsCalculator
+from validation import ConfigValidator
 
-# Logging configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('training.log')
-    ]
-)
+from config import Config
 
-isf = IsolationForestConfig()
+# ============================================================================
+# LOGGING CONFIGURATION
+# ============================================================================
+
+def setup_logging():
+    """Configure logging for the training pipeline."""
+    config.LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    
+    logging.basicConfig(
+        level=getattr(logging, config.LOG_LEVEL),
+        format=config.LOG_FORMAT,
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler(config.LOG_FILE)
+        ]
+    )
+
 
 logger = logging.getLogger(__name__)
 
+
+# ============================================================================
+# TRAINING PIPELINE
+# ============================================================================
+
 class TrainingPipeline:
-    """Complete pipeline for model training"""
-    def __init__(self, data_dir: Path = isf.DATA_DIR, model_dir: Path = isf.MODEL_DIR, metrics_dir: Path = isf.METRICS_DIR):
+    """
+    Complete pipeline for Isolation Forest model training.
+    
+    This pipeline:
+    - Loads the preprocessor created by the Historical Ingestion Service
+    - Loads raw training and test data
+    - Applies preprocessing using the fitted preprocessor
+    - Trains the Isolation Forest model
+    - Evaluates and saves artifacts
+    """
+    
+    def __init__(
+        self,
+        data_dir: Path = config.RAW_DATA_DIR,
+        models_dir: Path = config.MODELS_DIR,
+        metrics_dir: Path = config.METRICS_DIR
+    ):
         """
-        Initializes the training pipeline
+        Initialize the training pipeline.
         
         Args:
-            data_dir: Directory containing historical data
-            model_dir: Directory to save trained models
-            metrics_dir: Directory to save metrics
+            data_dir: Directory containing raw data files
+            models_dir: Directory for model artifacts
+            metrics_dir: Directory for metrics output
         """
-        self.data_dir = data_dir
-        self.model_dir = model_dir
-        self.metrics_dir = metrics_dir
-
-        self.data_loader = DataLoader(data_dir) ############ Using the unedited historical data
+        self.data_dir = Path(data_dir)
+        self.models_dir = Path(models_dir)
+        self.metrics_dir = Path(metrics_dir)
+        
+        # Initialize components
+        self.data_loader = DataLoader(self.data_dir)
+        self.preprocessor = None
         self.model = None
-        self.validator = ConfigValidator(data_dir, model_dir, metrics_dir)
         self.metrics_calculator = MetricsCalculator()
+        
+        # Validator for paths
+        self.validator = ConfigValidator(
+            data_dir=self.data_dir,
+            model_dir=self.models_dir,
+            metrics_dir=self.metrics_dir
+        )
+        
+        logger.info("TrainingPipeline initialized")
+        logger.info(f"  Data directory: {self.data_dir}")
+        logger.info(f"  Models directory: {self.models_dir}")
+        logger.info(f"  Metrics directory: {self.metrics_dir}")
 
     def validate_configuration(self) -> bool:
-        """Validates the configuration
+        """
+        Validate that all required paths and files exist.
         
         Returns:
-            bool: True if validation succeeded
+            bool: True if validation successful, False otherwise
         """
         logger.info("=" * 80)
-        logger.info("CONFIGURATION VALIDATION")
+        logger.info("VALIDATING CONFIGURATION")
         logger.info("=" * 80)
         
         is_valid, error_msg = self.validator.validate_all()
         
         if not is_valid:
-            logger.error(f"Validation failed: {error_msg}")
+            logger.error(f"Configuration validation failed: {error_msg}")
             return False
         
-        logger.info("Configuration successfully validated")
+        logger.info("✓ Configuration validation successful")
         return True
-    
-    def load_preprocess_data(self, filepattern: str = isf.TRAIN_FILENAME):
+
+    def load_preprocessor(self, preprocessor_path: Optional[Path] = None) -> None:
         """
-        Loads and preprocesses the data
+        Load the preprocessor artifact created by Historical Ingestion Service.
         
         Args:
-            filepattern: Pattern for files to load
+            preprocessor_path: Path to preprocessor artifact. If None, uses default.
         
-        Returns:
-            pd.DataFrame: Preprocessed features (X)
-        """    
-        logger.info("=" * 80)
-        logger.info("LOADING AND PREPROCESSING DATA")
-        logger.info("=" * 80)
-        
-        # Load data
-        data = self.data_loader.load_data(filepattern)
-
-        # Preprocess (fit=True for training)
-        X = self.data_loader.preprocess_data(data, fit=True)
-
-        logger.info(f"Data ready: {X.shape[0]} samples, {X.shape[1]} features")
-
-        return X
-     
-    def train_model(self, X_train: pd.DataFrame, model_params: dict = None):
+        Raises:
+            FileNotFoundError: If preprocessor artifact doesn't exist
         """
-        Trains the Isolation Forest model
-    
+        if preprocessor_path is None:
+            preprocessor_path = self.models_dir / config.PREPROCESSOR_ARTIFACT
+        
+        preprocessor_path = Path(preprocessor_path)
+        
+        if not preprocessor_path.exists():
+            raise FileNotFoundError(
+                f"Preprocessor artifact not found: {preprocessor_path}. "
+                f"Make sure the Historical Ingestion Service has run successfully."
+            )
+        
+        logger.info(f"Loading preprocessor from: {preprocessor_path}")
+        
+        try:
+            self.preprocessor = joblib.load(preprocessor_path)
+            logger.info("✓ Preprocessor loaded successfully")
+            
+            # Log preprocessor info
+            if hasattr(self.preprocessor, 'feature_columns'):
+                logger.info(
+                    f"  Preprocessor expects {len(self.preprocessor.feature_columns)} features"
+                )
+            
+        except Exception as e:
+            logger.error(f"Error loading preprocessor: {e}")
+            raise
+
+    def load_and_preprocess_data(
+        self,
+        file_pattern: str,
+        dataset_name: str = "data"
+    ) -> Tuple[pd.DataFrame, Optional[pd.Series]]:
+        """
+        Load raw data and apply preprocessing.
+        
         Args:
-            X_train: Training features
-            model_params: Model parameters
-    
+            file_pattern: Glob pattern for files to load
+            dataset_name: Name of dataset (for logging)
+        
         Returns:
-            IsolationForestModel: Trained model
-        """        
+            Tuple[pd.DataFrame, Optional[pd.Series]]: 
+                - Preprocessed features (X)
+                - Labels if available (y), None otherwise
+        """
+        logger.info(f"Loading {dataset_name} data...")
+        
+        # Load raw data
+        df_raw = self.data_loader.load_data(file_pattern)
+        logger.info(f"  Loaded {len(df_raw)} samples")
+        
+        # Extract labels if present
+        y = None
+        if 'Is_Anomaly' in df_raw.columns:
+            y = df_raw['Is_Anomaly']
+            logger.info(f"  Found labels: {y.sum()} anomalies ({y.mean():.2%})")
+        else:
+            logger.warning(f"  No labels found in {dataset_name}")
+        
+        # Apply preprocessing using the fitted preprocessor
+        logger.info(f"Applying preprocessing to {dataset_name}...")
+        
+        if self.preprocessor is None:
+            raise RuntimeError(
+                "Preprocessor not loaded. Call load_preprocessor() first."
+            )
+        
+        try:
+            # Use the transform method (fit=False)
+            X = self.preprocessor.preprocess_data(df_raw, fit=False)
+            logger.info(f"✓ Preprocessing complete: {X.shape[1]} features")
+            
+            return X, y
+            
+        except Exception as e:
+            logger.error(f"Error during preprocessing: {e}")
+            raise
+
+    def train_model(
+        self,
+        X_train: pd.DataFrame,
+        model_params: Optional[dict] = None
+    ) -> None:
+        """
+        Train the Isolation Forest model.
+        
+        Args:
+            X_train: Preprocessed training features
+            model_params: Model parameters (uses config defaults if None)
+        """
         logger.info("=" * 80)
         logger.info("TRAINING MODEL")
         logger.info("=" * 80)
         
         if model_params is None:
-            model_params = ISOLATION_FOREST_PARAMS
+            model_params = config.ISOLATION_FOREST_PARAMS
         
-        logger.info(f"Training on {X_train.shape[0]} samples with {X_train.shape[1]} features")
+        logger.info(f"Training on {X_train.shape[0]} samples, {X_train.shape[1]} features")
+        logger.info(f"Model parameters: {model_params}")
         
-        self.model = IsolationForestModel(**model_params)
-        self.model.train(X_train)
+        try:
+            self.model = IsolationForestModel(**model_params)
+            self.model.train(X_train)
+            logger.info("✓ Model training complete")
+            
+        except Exception as e:
+            logger.error(f"Error during training: {e}")
+            raise
 
-        logger.info("Training completed successfully")
-    
-        return self.model
-    
-    def evaluate_model(self, X_test: pd.DataFrame, y_test: Optional[pd.Series] = None):
+    def evaluate_model(
+        self,
+        X_test: pd.DataFrame,
+        y_test: Optional[pd.Series] = None
+    ) -> dict:
         """
-        Evaluates the model on the test set
+        Evaluate the trained model on test data.
         
         Args:
-            X_test: Test features (preprocessed)
-            y_test: True labels (optional, for supervised metrics)
+            X_test: Preprocessed test features
+            y_test: Test labels (optional)
         
         Returns:
-            Dict: Evaluation metrics
+            dict: Evaluation metrics
         """
         logger.info("=" * 80)
-        logger.info("MODEL EVALUATION")
+        logger.info("EVALUATING MODEL")
         logger.info("=" * 80)
         
         if self.model is None or not self.model.is_trained:
-            raise RuntimeError("The model must be trained before evaluation")
+            raise RuntimeError("Model must be trained before evaluation")
         
         logger.info(f"Evaluating on {X_test.shape[0]} samples")
         
+        # Get predictions and scores
         y_pred = self.model.predict(X_test)
         scores = self.model.score_samples(X_test)
         
-        X_test_original = self.data_loader.inverse_transform(X_test)
+        # Save predictions
+        self._save_predictions(X_test, y_pred, scores, y_test)
         
-        logger.info(f"X_test shape after inverse_transform: {X_test_original.shape}")
-        logger.info(f"X_test columns: {X_test_original.columns.tolist()}")
-        logger.info(f"X_test sample (first row):\n{X_test_original.iloc[0]}")
-
-        df_final = X_test_original.copy()
-        df_final['anomaly_prediction'] = y_pred
-        df_final['anomaly_score'] = scores
-
+        # Calculate metrics
         if y_test is not None:
-            df_final['Is_Anomaly'] = y_test.values
-
-        df_final.to_csv(self.metrics_dir / "test_predictions.csv", index=False)
-        logger.info("Predictions saved to test_predictions.csv")
-        
-        if y_test is not None:
-            logger.info("Calculating supervised metrics with true labels...")
-            metrics = self.metrics_calculator.calculate_metrics(
+            logger.info("Calculating supervised metrics...")
+            metrics = self.metrics_calculator.calculate_supervised_metrics(
                 y_true=y_test.values,
                 y_pred=y_pred,
-                scores=scores,
-                X=X_test.values
+                scores=scores
             )
-            
-            self.metrics_calculator.print_summary()
         else:
-            logger.info("No labels available, calculating unsupervised metrics...")
+            logger.info("No labels available - calculating unsupervised metrics...")
             metrics = self.metrics_calculator.calculate_unsupervised_metrics(
                 y_pred=y_pred,
-                scores=scores,
-                X=X_test.values
+                scores=scores
             )
-
+        
+        # Print summary
+        self.metrics_calculator.print_summary()
+        
         return metrics
-    
-    def save_artifacts(self):
-        """Saves model, scaler, and metrics"""
+
+    def _save_predictions(
+        self,
+        X_test: pd.DataFrame,
+        y_pred: pd.Series,
+        scores: pd.Series,
+        y_test: Optional[pd.Series] = None
+    ) -> None:
+        """
+        Save predictions to CSV file.
+        
+        Args:
+            X_test: Test features
+            y_pred: Predictions
+            scores: Anomaly scores
+            y_test: True labels (optional)
+        """
+        # Create predictions DataFrame
+        df_pred = pd.DataFrame({
+            'anomaly_prediction': y_pred,
+            'anomaly_score': scores
+        })
+        
+        # Add true labels if available
+        if y_test is not None:
+            df_pred['is_anomaly_true'] = y_test.values
+        
+        # Save to file
+        predictions_path = self.metrics_dir / config.PREDICTIONS_FILE
+        df_pred.to_csv(predictions_path, index=False)
+        
+        logger.info(f"✓ Predictions saved to: {predictions_path}")
+
+    def save_artifacts(self) -> None:
+        """Save all training artifacts (model and metrics)."""
         logger.info("=" * 80)
         logger.info("SAVING ARTIFACTS")
         logger.info("=" * 80)
         
         if self.model is None or not self.model.is_trained:
-            raise RuntimeError("The model must be trained before saving")
-
-        model_path = self.model_dir / isf.MODEL_FILENAME
+            raise RuntimeError("Model must be trained before saving")
+        
+        # Save model
+        model_path = self.models_dir / config.MODEL_ARTIFACT
         self.model.save_model(model_path)
+        logger.info(f"✓ Model saved to: {model_path}")
         
-        scaler_path = self.model_dir / isf.SCALER_FILENAME
-        self.data_loader.save_scaler(scaler_path)
-        
-        metrics_path = self.metrics_dir / isf.METRICS_FILENAME
+        # Save metrics
+        metrics_path = self.metrics_dir / config.METRICS_ARTIFACT
         self.metrics_calculator.save_metrics(metrics_path)
+        logger.info(f"✓ Metrics saved to: {metrics_path}")
         
-        logger.info("All artifacts saved successfully")
-    
-    def run_training_evaluate(self,
-                              train_file: str = isf.TRAIN_FILENAME,
-                              test_file: str = isf.TEST_FILENAME,
-                              model_params: dict = None):
+        logger.info("✓ All artifacts saved successfully")
+
+    def run(
+        self,
+        train_pattern: str = config.TRAIN_FILE_PATTERN,
+        test_pattern: str = config.TEST_FILE_PATTERN,
+        model_params: Optional[dict] = None
+    ) -> dict:
         """
-        Executes the full training and evaluation pipeline
+        Execute the complete training pipeline.
         
         Args:
-            train_file: Training file name
-            test_file: Test file name
-            model_params: Model parameters
+            train_pattern: Pattern for training files
+            test_pattern: Pattern for test files
+            model_params: Model parameters (optional)
         
         Returns:
-            Dict: Evaluation metrics
+            dict: Evaluation metrics
         """
         try:
             logger.info("=" * 80)
-            logger.info("STARTING ISOLATION FOREST TRAINING PIPELINE")
+            logger.info("STARTING TRAINING PIPELINE")
             logger.info("=" * 80)
             
+            # Step 1: Validate configuration
             if not self.validate_configuration():
                 raise RuntimeError("Configuration validation failed")
             
-            logger.info("Loading training data...")
-            X_train = self.load_preprocess_data(filepattern=train_file)
+            # Step 2: Load preprocessor (created by Historical Ingestion Service)
+            self.load_preprocessor()
             
-            self.train_model(X_train, model_params=model_params)
+            # Step 3: Load and preprocess training data
+            logger.info("=" * 80)
+            logger.info("LOADING TRAINING DATA")
+            logger.info("=" * 80)
+            X_train, _ = self.load_and_preprocess_data(
+                file_pattern=train_pattern,
+                dataset_name="training"
+            )
             
-            logger.info("Loading test data...")
-            data_test = self.data_loader.load_data(test_file)
-
-            y_test = None
-            if 'Is_Anomaly' in data_test.columns:
-                y_test = data_test['Is_Anomaly']
-                logger.info(f"'Is_Anomaly' labels found in test set")
-                logger.info(f"Distribution: {y_test.value_counts().to_dict()}")
-                anomaly_rate = y_test.mean()
-                logger.info(f"  Anomaly rate: {anomaly_rate:.2%} ({int(y_test.sum())}/{len(y_test)})")
-            else:
-                logger.warning("'Is_Anomaly' column not found in test set")
-                logger.warning("Only unsupervised metrics will be calculated")
-
-            X_test = self.data_loader.preprocess_data(data_test, fit=False)
+            # Step 4: Train model
+            self.train_model(X_train, model_params)
             
-            logger.info(f"Original test columns: {data_test.columns.tolist()}")
-            logger.info(f"X_test columns after preprocessing: {X_test.columns.tolist()}")
-            logger.info(f"Scaler feature columns: {self.data_loader.feature_columns}")
-
-            sample_idx = 0
-            logger.info(f"\nSample {sample_idx} - ORIGINAL values:")
-            for col in self.data_loader.feature_columns:
-                if col in data_test.columns:
-                    logger.info(f"  {col}: {data_test[col].iloc[sample_idx]}")
-
-            logger.info(f"\nSample {sample_idx} - SCALED values:")
-            logger.info(f"{X_test.iloc[sample_idx].to_dict()}")
-
+            # Step 5: Load and preprocess test data
+            logger.info("=" * 80)
+            logger.info("LOADING TEST DATA")
+            logger.info("=" * 80)
+            X_test, y_test = self.load_and_preprocess_data(
+                file_pattern=test_pattern,
+                dataset_name="test"
+            )
+            
+            # Step 6: Evaluate model
             metrics = self.evaluate_model(X_test, y_test)
             
+            # Step 7: Save artifacts
             self.save_artifacts()
             
             logger.info("=" * 80)
-            logger.info("PIPELINE COMPLETED SUCCESSFULLY")
+            logger.info("✓ TRAINING PIPELINE COMPLETED SUCCESSFULLY")
             logger.info("=" * 80)
             
             return metrics
-        
+            
         except Exception as e:
-            logger.error(f"Error during pipeline execution: {e}", exc_info=True)
+            logger.error("=" * 80)
+            logger.error("✗ TRAINING PIPELINE FAILED")
+            logger.error("=" * 80)
+            logger.error(f"Error: {e}", exc_info=True)
             raise
 
-if __name__ == "__main__":
+
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
+
+def main():
+    """Main entry point for the training script."""
+    setup_logging()
+    
+    logger.info("Initializing training pipeline...")
+    
     pipeline = TrainingPipeline()
-    metrics = pipeline.run_training_evaluate()
-    logger.info(f"Final metrics: {metrics}")
+    
+    try:
+        metrics = pipeline.run()
+        logger.info(f"Training completed with metrics: {metrics}")
+        sys.exit(0)
+        
+    except Exception as e:
+        logger.error(f"Training failed: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

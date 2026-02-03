@@ -1,50 +1,110 @@
+"""
+Data loading module for Training Service.
+Handles loading of raw data files without preprocessing.
+"""
 import logging
 from pathlib import Path
+from typing import List
 import pandas as pd
 
-logger=logging.getLogger(__name__)  # logger associated with the current module/file
+logger = logging.getLogger(__name__)
+
 
 class DataLoader:
-    """Class for data loading and preprocessing"""
+    """
+    Handles data loading operations.
+    Does NOT perform preprocessing - that's the preprocessor's job.
+    """
+    
     def __init__(self, data_dir: Path):
-        self.data_dir = Path(data_dir)
-
-    def load_data(self, filename: str = "*.parquet") -> pd.DataFrame:
         """
-        Loads data from the directory
+        Initialize the DataLoader.
+        
         Args:
-            filename: Pattern for files to load
-        Returns:
-            pd.DataFrame: DataFrame with all loaded data
+            data_dir: Directory containing data files
         """
-        data_files=list(self.data_dir.glob(filename))
+        self.data_dir = Path(data_dir)
+        logger.info(f"DataLoader initialized with directory: {self.data_dir}")
+
+    def load_data(self, filename_pattern: str = "*.parquet") -> pd.DataFrame:
+        """
+        Load data files matching the pattern.
+        
+        Args:
+            filename_pattern: Glob pattern for files to load (e.g., "train*.parquet")
+        
+        Returns:
+            pd.DataFrame: Concatenated raw data
+        
+        Raises:
+            FileNotFoundError: If no files match the pattern
+            ValueError: If no data was loaded successfully
+        """
+        data_files = list(self.data_dir.glob(filename_pattern))
 
         if not data_files:
-            raise FileNotFoundError (f"No file found with pattern {filename} in {self.data_dir}")
+            raise FileNotFoundError(
+                f"No files found with pattern '{filename_pattern}' in {self.data_dir}"
+            )
         
-        logger.info(f"Loading {len(data_files)} files...")
+        logger.info(f"Found {len(data_files)} file(s) matching pattern '{filename_pattern}'")
 
-        dfs= []
+        dataframes = []
         for file_path in data_files:
             try:
-                if file_path.suffix == ".csv":
-                    df = pd.read_csv(file_path, sep=None, engine="python", encoding_errors="replace")  # auto-detect separator,  more tolerant parser, avoids encoding crashes
-                elif file_path.suffix == ".parquet":
-                    df= pd.read_parquet(file_path)    
-                else:
-                    logger.warning(f"Unsupported file type: {file_path}")
-                    continue
-                logger.info(f" Loaded {file_path.name}: {len(df)} rows, {len(df.columns)} columns")
-                dfs.append(df)
+                df = self._load_single_file(file_path)
+                logger.info(
+                    f"Loaded {file_path.name}: {len(df)} rows, {len(df.columns)} columns"
+                )
+                dataframes.append(df)
             except Exception as e:
                 logger.error(f"Error loading {file_path}: {e}")
                 continue
 
-        if not dfs:
+        if not dataframes:
             raise ValueError("No data was loaded successfully")
         
         # Concatenate all DataFrames
-        data=pd.concat(dfs, ignore_index= True)
-        logger.info(f"Total data loaded: {len(data)} rows, {len(data.columns)} columns")
+        data = pd.concat(dataframes, ignore_index=True)
+        logger.info(
+            f"Total data loaded: {len(data)} rows, {len(data.columns)} columns"
+        )
 
         return data
+
+    def _load_single_file(self, file_path: Path) -> pd.DataFrame:
+        """
+        Load a single data file based on its extension.
+        
+        Args:
+            file_path: Path to the file
+        
+        Returns:
+            pd.DataFrame: Loaded data
+        
+        Raises:
+            ValueError: If file type is not supported
+        """
+        if file_path.suffix == ".csv":
+            return pd.read_csv(
+                file_path,
+                sep=None,
+                engine="python",
+                encoding_errors="replace"
+            )
+        elif file_path.suffix == ".parquet":
+            return pd.read_parquet(file_path)
+        else:
+            raise ValueError(f"Unsupported file type: {file_path.suffix}")
+
+    def get_available_files(self, pattern: str = "*") -> List[Path]:
+        """
+        Get list of available files in data directory.
+        
+        Args:
+            pattern: Glob pattern to filter files
+        
+        Returns:
+            List[Path]: List of file paths
+        """
+        return sorted(self.data_dir.glob(pattern))

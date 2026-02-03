@@ -1,4 +1,9 @@
+version: '3.8'
+
 services:
+  # ============================================================================
+  # REDPANDA - Message Broker (Kafka-compatible)
+  # ============================================================================
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:latest
     container_name: redpanda_broker
@@ -19,15 +24,17 @@ services:
       - "18081:18081" # Schema Registry
       - "18082:18082" # Pandaproxy
       - "19092:19092" # Kafka API (external)
-      - "19644:9644" # Admin API
+      - "19644:9644"  # Admin API
     volumes:
       - ./redpanda_storage:/var/lib/redpanda/data
     healthcheck:
-      test: [ "CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1" ]
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
       interval: 15s
       timeout: 3s
       retries: 5
       start_period: 5s
+    networks:
+      - anomaly-detection-network
 
   redpanda-console:
     image: docker.redpanda.com/redpandadata/console:latest
@@ -41,24 +48,77 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
-
-  # ingestion:
-  #   build:
-  #     context: .
-  #     dockerfile: services/ingestion_service/Dockerfile
-  #   ports:
-  #     - '9090:9090'
-  #   volumes:
-  #     - ./models:/ingestion/models
-  #     - ./config:/ingestion/config
+    networks:
+      - anomaly-detection-network
 
   hist_ingestion:
     build: 
       context: .
       dockerfile: services/historical_ingestion_service/Dockerfile
+    container_name: historical_ingestion_service
     environment:
-      - APP_HOME=/hist_ingestion           
+      - APP_HOME=/hist_ingestion
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
     volumes:
-      - ./data:/hist_ingestion/data         
-      - ./models:/hist_ingestion/models 
+      - ./data:/hist_ingestion/data
+      - ./models:/hist_ingestion/models
       - ./metrics:/hist_ingestion/metrics
+      - ./logs/historical_ingestion:/hist_ingestion/logs
+    networks:
+      - anomaly-detection-network
+    restart: "no"
+
+
+  training:
+    build:
+      context: .
+      dockerfile: services/training_service/Dockerfile
+    container_name: training_service
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+      - DATA_DIR=/app/data
+      - MODELS_DIR=/app/models
+      - METRICS_DIR=/app/metrics
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./metrics:/app/metrics
+      - ./logs/training:/app/logs
+      - ./services/training_service/config:/app/config
+    depends_on:
+      hist_ingestion:
+        condition: service_completed_successfully
+    networks:
+      - anomaly-detection-network
+    restart: "no"
+
+  # ingestion:
+  #   build:
+  #     context: .
+  #     dockerfile: services/ingestion_service/Dockerfile
+  #   container_name: ingestion_service
+  #   ports:
+  #     - '9090:9090'
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #     - KAFKA_BROKER=redpanda:9092
+  #   volumes:
+  #     - ./models:/ingestion/models
+  #     - ./config:/ingestion/config
+  #     - ./logs/ingestion:/ingestion/logs
+  #   depends_on:
+  #     redpanda:
+  #       condition: service_healthy
+  #     training:
+  #       condition: service_completed_successfully
+  #   networks:
+  #     - anomaly-detection-network
+
+
+networks:
+  anomaly-detection-network:
+    driver: bridge
+    name: anomaly-detection-network
+

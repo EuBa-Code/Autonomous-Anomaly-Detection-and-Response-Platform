@@ -1192,6 +1192,7 @@ ingestion = [
 ]
 training-ml = [
     { name = "numpy" },
+    { name = "pyarrow" },
     { name = "scikit-learn" },
 ]
 
@@ -1215,5 +1216,6 @@ ingestion = [
 ]
 training-ml = [
     { name = "numpy", specifier = ">=2.4.1" },
+    { name = "pyarrow", specifier = ">=19.0.1" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
 ]

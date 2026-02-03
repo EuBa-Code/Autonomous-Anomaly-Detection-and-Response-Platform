@@ -1,52 +1,74 @@
-import os
+"""
+Configuration module for Training Service.
+Centralizes all paths and parameters.
+"""
 from pathlib import Path
-from dotenv import load_dotenv
 
-# Load variables from .env file
-load_dotenv()
 
-class IsolationForestConfig:
+class TrainingConfig:
+    """
+    Configuration class for the Training Service.
+    All paths and parameters should be defined here.
+    """
     
-    APP_HOME = os.getenv('APP_HOME', str(Path(__file__).resolve().parent.parent))
-    ROOT_DIR = Path(APP_HOME)
+    # ============================================================================
+    # PATHS
+    # ============================================================================
+    
+    # Root directories
+    ROOT_DIR = Path("/app")  # Container root
     DATA_DIR = ROOT_DIR / "data"
-
-    """Specific settings for the Anomaly Detection Model"""
-
-    BASE_DIR = DATA_DIR
-    DATA_DIR = BASE_DIR / "data/historical_data"
-    MODEL_DIR = BASE_DIR / "models"
-    METRICS_DIR = BASE_DIR / "metrics"
-
-    HISTORICAL_DIR = DATA_DIR / "historical_data"
-    SYNTHETIC_DIR = DATA_DIR / "synthetic_data_creation"
+    MODELS_DIR = ROOT_DIR / "models"
+    METRICS_DIR = ROOT_DIR / "metrics"
     
-    # Files
-    TRAIN_PATH = HISTORICAL_DIR / "train_set.parquet"
-    TEST_PATH = HISTORICAL_DIR / "test_set.parquet"
+    # Data subdirectories
+    RAW_DATA_DIR = DATA_DIR / "raw"
+    PROCESSED_DATA_DIR = DATA_DIR / "processed"
     
-    # Isolation Forest parameters
+    # ============================================================================
+    # FILE PATTERNS
+    # ============================================================================
+    
+    TRAIN_FILE_PATTERN = "train*.parquet"
+    TEST_FILE_PATTERN = "test*.parquet"
+    
+    # ============================================================================
+    # ARTIFACT NAMES
+    # ============================================================================
+    
+    MODEL_ARTIFACT = "isolation_forest_model.pkl"
+    PREPROCESSOR_ARTIFACT = "preprocessor.pkl"
+    METRICS_ARTIFACT = "training_metrics.json"
+    PREDICTIONS_FILE = "test_predictions.csv"
+    
+    # ============================================================================
+    # MODEL PARAMETERS
+    # ============================================================================
+    
     ISOLATION_FOREST_PARAMS = {
         'n_estimators': 100,
+        'contamination': 0.1,  # Expected proportion of anomalies
         'max_samples': 'auto',
-        'contamination': 0.1,  # Expected percentage of anomalies
-        'max_features': 1.0,
-        'bootstrap': False,
         'random_state': 42,
-        'n_jobs': -1,
+        'n_jobs': -1,  # Use all available cores
         'verbose': 0
     }
+    
+    # ============================================================================
+    # PREPROCESSING
+    # ============================================================================
+    
+    # Columns to exclude from features (labels, IDs, timestamps)
+    LABEL_COLUMNS = ['Is_Anomaly', 'Anomaly_Type', 'Machine_ID', 'timestamp']
+    
+    # ============================================================================
+    # LOGGING
+    # ============================================================================
+    
+    LOG_LEVEL = "INFO"
+    LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    LOG_FILE = ROOT_DIR / "logs" / "training.log"
 
-    MODEL_FILENAME = 'isolation_forest_model.pkl'
-    METRICS_FILENAME = "training_metrics.json"
-    SCALER_FILENAME = "scaler.pkl"
 
-    MODEL_DIR = DATA_DIR / 'models'
-    METRICS_DIR = DATA_DIR / 'metrics'
-
-    # Full output paths
-    MODEL_PATH = MODEL_DIR / MODEL_FILENAME
-    SCALER_PATH = MODEL_DIR / SCALER_FILENAME
-    METRICS_PATH = METRICS_DIR / METRICS_FILENAME
-
-    PREPROCESSOR_JOBLIB = MODEL_DIR / 'preprocessor.joblib'
+# Create a singleton instance
+config = TrainingConfig()
