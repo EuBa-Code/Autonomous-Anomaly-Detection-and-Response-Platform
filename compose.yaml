@@ -41,3 +41,16 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
+
+  training:
+    build: ./services/training_service
+    volumes:
+      - ./models:/app/models  
+      - ./data:/app/data
+
+  inference:
+    build: ./services/inference_service
+    volumes:
+      - ./models:/app/models:ro
+    depends_on:
+      - training
