@@ -7,17 +7,8 @@ from pathlib import Path
 from typing import Optional
 import pandas as pd
 
-from config_model import (
-    DATA_DIR,
-    MODEL_DIR,
-    METRICS_DIR,
-    TRAIN_FILENAME,
-    TEST_FILENAME,
-    ISOLATION_FOREST_PARAMS,
-    MODEL_FILENAME,
-    METRICS_FILENAME,
-    SCALER_FILENAME
-)
+from config import IsolationForestConfig
+
 from validation import ConfigValidator
 from dataloader import DataLoader
 from model import IsolationForestModel
@@ -33,11 +24,13 @@ logging.basicConfig(
     ]
 )
 
+isf = IsolationForestConfig()
+
 logger = logging.getLogger(__name__)
 
 class TrainingPipeline:
     """Complete pipeline for model training"""
-    def __init__(self, data_dir: Path = DATA_DIR, model_dir: Path = MODEL_DIR, metrics_dir: Path = METRICS_DIR):
+    def __init__(self, data_dir: Path = isf.DATA_DIR, model_dir: Path = isf.MODEL_DIR, metrics_dir: Path = isf.METRICS_DIR):
         """
         Initializes the training pipeline
         
@@ -74,7 +67,7 @@ class TrainingPipeline:
         logger.info("Configuration successfully validated")
         return True
     
-    def load_preprocess_data(self, filepattern: str = TRAIN_FILENAME):
+    def load_preprocess_data(self, filepattern: str = isf.TRAIN_FILENAME):
         """
         Loads and preprocesses the data
         
@@ -193,20 +186,20 @@ class TrainingPipeline:
         if self.model is None or not self.model.is_trained:
             raise RuntimeError("The model must be trained before saving")
 
-        model_path = self.model_dir / MODEL_FILENAME
+        model_path = self.model_dir / isf.MODEL_FILENAME
         self.model.save_model(model_path)
         
-        scaler_path = self.model_dir / SCALER_FILENAME
+        scaler_path = self.model_dir / isf.SCALER_FILENAME
         self.data_loader.save_scaler(scaler_path)
         
-        metrics_path = self.metrics_dir / METRICS_FILENAME
+        metrics_path = self.metrics_dir / isf.METRICS_FILENAME
         self.metrics_calculator.save_metrics(metrics_path)
         
         logger.info("All artifacts saved successfully")
     
     def run_training_evaluate(self,
-                              train_file: str = TRAIN_FILENAME,
-                              test_file: str = TEST_FILENAME,
+                              train_file: str = isf.TRAIN_FILENAME,
+                              test_file: str = isf.TEST_FILENAME,
                               model_params: dict = None):
         """
         Executes the full training and evaluation pipeline
