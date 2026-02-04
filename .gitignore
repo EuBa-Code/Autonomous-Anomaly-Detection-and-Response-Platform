@@ -40,3 +40,7 @@ PROJECT_ARCHITECTURE.md
 # Airflow
 airflow_db/
 airflow_logs/
+
+# Apache Spark
+models/spark_preprocessor
+data/historical_processed

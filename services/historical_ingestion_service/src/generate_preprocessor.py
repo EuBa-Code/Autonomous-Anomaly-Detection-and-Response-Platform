@@ -3,10 +3,10 @@ import logging
 import sys
 from pathlib import Path
 from pyspark.sql import SparkSession
+import os
 
 # Config imports (assuming these exist in your config file)
-from config.config import RAW_DATA_PATH, OUTPUT_PATH, PROCESSED_DATA_PATH
-# Note: You might need a new config var for where to save the PROCESSED data for Feast
+from config import RAW_DATA_PATH, MODEL_REGISTRY_PATH, PROCESSED_DATA_PATH
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -50,19 +50,23 @@ def generate():
 
         # 4. Save the Model (The Scaler/Pipeline)
         # Spark saves models as folders, not single files
-        model_output_path = OUTPUT_PATH / "spark_pipeline_model"
+        model_output_path = MODEL_REGISTRY_PATH / "spark_preprocessor"
+        
+        # Ensure the parent 'models' directory exists
+        os.makedirs(str(MODEL_REGISTRY_PATH), exist_ok=True)
+        
         preprocessor.save_model(model_output_path)
         logger.info(f"✅ Pipeline Model saved to {model_output_path}")
 
-        # 5. Save the Data for Feast (Offline Store)
-        # Feast reads Parquet. We save the transformed data there.
-        logger.info(f"Saving processed data to {PROCESSED_DATA_PATH}...")
+        # 5. Save the Data for Feast
+        # Ensure the processed data directory exists
+        os.makedirs(str(PROCESSED_DATA_PATH.parent), exist_ok=True)
         
         df_transformed.write \
             .mode("overwrite") \
             .parquet(str(PROCESSED_DATA_PATH))
             
-        logger.info("✅ Processed data saved successfully.")
+        logger.info(f"✅ Processed data saved to {PROCESSED_DATA_PATH}")
 
     except Exception as e:
         logger.error(f"Job failed: {e}", exc_info=True)
