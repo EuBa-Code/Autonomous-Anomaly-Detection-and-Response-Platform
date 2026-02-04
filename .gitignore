@@ -40,6 +40,8 @@ PROJECT_ARCHITECTURE.md
 # Airflow
 airflow_db/
 airflow_logs/
+COMPREHENSIVE_PROJECT_DOCS.md
+
 
 # Apache Spark
 models/spark_preprocessor
