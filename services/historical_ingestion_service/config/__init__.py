@@ -1,7 +1,8 @@
-from .config import BASE_DIR, RAW_DATA_PATH, OUTPUT_PATH
+from .config import BASE_DIR, RAW_DATA_PATH, OUTPUT_PATH, PROCESSED_DATA_PATH
 
 __all__ = (
     "BASE_DIR",
     "RAW_DATA_PATH",
-    "OUTPUT_PATH"
+    "OUTPUT_PATH",
+    "PROCESSED_DATA_PATH"
 )

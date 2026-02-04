@@ -51,6 +51,7 @@ services:
     networks:
       - anomaly-detection-network
 
+  # Historical Data Ingestion & Feature Engineering Service
   hist_ingestion:
     build: 
       context: .
@@ -60,15 +61,22 @@ services:
       - APP_HOME=/hist_ingestion
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
+      # Spark Driver memory - adjust based on your host RAM
+      - SPARK_DRIVER_MEMORY=4g
     volumes:
       - ./data:/hist_ingestion/data
       - ./models:/hist_ingestion/models
       - ./metrics:/hist_ingestion/metrics
       - ./logs/historical_ingestion:/hist_ingestion/logs
+    ports:
+      # Spark UI: Access at http://localhost:4040 while the job is running
+      - "4040:4040"
     networks:
       - anomaly-detection-network
+    # More memory to use PySpark
+    shm_size: '2gb' 
+    # Job should run once and exit
     restart: "no"
-
 
   training:
     build:

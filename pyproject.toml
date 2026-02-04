@@ -24,7 +24,7 @@ ingestion = [
 ]
 
 hist_ingestion = [
-    "scikit-learn>=1.8.0",
+    "pyspark>=4.1.1",
 ]
 
 training_ml = [

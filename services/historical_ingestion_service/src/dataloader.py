@@ -1,50 +1,49 @@
 import logging
+from pyspark.sql import SparkSession, DataFrame
 from pathlib import Path
-import pandas as pd
 
-logger=logging.getLogger(__name__)  # logger associated with the current module/file
+logger = logging.getLogger(__name__)
 
 class DataLoader:
-    """Class for data loading and preprocessing"""
-    def __init__(self, data_dir: Path):
-        self.data_dir = Path(data_dir)
-
-    def load_data(self, filename: str = "*.parquet") -> pd.DataFrame:
+    """Class for data loading using PySpark"""
+    def __init__(self, spark: SparkSession, data_dir: Path):
         """
-        Loads data from the directory
         Args:
-            filename: Pattern for files to load
-        Returns:
-            pd.DataFrame: DataFrame with all loaded data
+            spark: Active SparkSession
+            data_dir: Path to the directory containing data
         """
-        data_files=list(self.data_dir.glob(filename))
+        self.spark = spark
+        self.data_dir = str(data_dir) # Spark expects string paths
 
-        if not data_files:
-            raise FileNotFoundError (f"No file found with pattern {filename} in {self.data_dir}")
+    def load_data(self, file_pattern: str = "*.parquet", file_format: str = "parquet") -> DataFrame:
+        """
+        Loads data from the directory using Spark's distributed reader.
         
-        logger.info(f"Loading {len(data_files)} files...")
+        Args:
+            file_pattern: Pattern for files (e.g., "*.parquet")
+            file_format: format specifier for spark.read (parquet, csv, etc.)
+        Returns:
+            DataFrame: Spark DataFrame
+        """
+        full_path = f"{self.data_dir}/{file_pattern}"
+        logger.info(f"Attempting to load data from: {full_path}")
 
-        dfs= []
-        for file_path in data_files:
-            try:
-                if file_path.suffix == ".csv":
-                    df = pd.read_csv(file_path, sep=None, engine="python", encoding_errors="replace")  # auto-detect separator,  more tolerant parser, avoids encoding crashes
-                elif file_path.suffix == ".parquet":
-                    df= pd.read_parquet(file_path)    
-                else:
-                    logger.warning(f"Unsupported file type: {file_path}")
-                    continue
-                logger.info(f" Loaded {file_path.name}: {len(df)} rows, {len(df.columns)} columns")
-                dfs.append(df)
-            except Exception as e:
-                logger.error(f"Error loading {file_path}: {e}")
-                continue
+        try:
+            # Spark handles wildcards (*) and multiple files automatically
+            df = self.spark.read.format(file_format) \
+                .option("header", "true") \
+                .option("inferSchema", "true") \
+                .load(full_path)
+            
+            # Action to count rows (triggers computation)
+            count = df.count()
+            logger.info(f"Successfully loaded data. Total rows: {count}")
+            
+            if count == 0:
+                raise ValueError(f"No data found in {full_path}")
+                
+            return df
 
-        if not dfs:
-            raise ValueError("No data was loaded successfully")
-        
-        # Concatenate all DataFrames
-        data=pd.concat(dfs, ignore_index= True)
-        logger.info(f"Total data loaded: {len(data)} rows, {len(data.columns)} columns")
-
-        return data
+        except Exception as e:
+            logger.error(f"Error loading data with Spark: {e}")
+            raise

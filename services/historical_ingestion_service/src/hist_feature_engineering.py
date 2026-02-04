@@ -1,110 +1,87 @@
-# Feature Engineering with QuixStreams
-import pandas as pd
-import numpy as np
 import logging
-import joblib
+from typing import List
+from pyspark.sql import DataFrame
+from pyspark.ml import Pipeline, PipelineModel
+from pyspark.ml.feature import VectorAssembler, StandardScaler, MinMaxScaler
 from pathlib import Path
-from typing import List, Optional, Union
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-# Configure logging (basic configuration)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class DataPreprocessor:
+class SparkDataPreprocessor:
     def __init__(self, label_columns: List[str], scaler_type: str = 'standard'):
         """
-        Initializes the preprocessor.
-        
         Args:
-            label_columns: List of column names to exclude from scaling (target variables).
-            scaler_type: Type of scaler to use ('standard' or 'minmax').
+            label_columns: Columns to EXCLUDE from scaling (IDs, Timestamps, Targets)
+            scaler_type: 'standard' or 'minmax'
         """
         self.label_columns = label_columns
-        self.feature_columns: Optional[List[str]] = None
+        self.scaler_type = scaler_type
+        self.model: PipelineModel = None
+        self.feature_cols: List[str] = []
+
+    def fit_transform(self, df: DataFrame) -> DataFrame:
+        """
+        Identifies numeric columns, assembles them, fits the scaler, 
+        and transforms the data.
+        """
+        logger.info("Starting PySpark preprocessing...")
+
+        # 1. Identify Numeric Columns automatically
+        # dtypes returns list of (col_name, data_type)
+        numeric_types = ['int', 'bigint', 'float', 'double']
+        all_cols = df.dtypes
         
-        # Initialize the specific scaler
-        if scaler_type == 'minmax':
-            self.scaler = MinMaxScaler()
+        self.feature_cols = [
+            name for name, dtype in all_cols 
+            if dtype in numeric_types and name not in self.label_columns
+        ]
+
+        logger.info(f"Features selected for scaling: {self.feature_cols}")
+
+        if not self.feature_cols:
+            raise ValueError("No numeric columns found to scale.")
+
+        # 2. VectorAssembler: Combines all feature cols into a single 'features_vec'
+        assembler = VectorAssembler(
+            inputCols=self.feature_cols, 
+            outputCol="unscaled_features",
+            handleInvalid="skip" # or 'keep'/'error' based on needs
+        )
+
+        # 3. Define Scaler
+        if self.scaler_type == 'minmax':
+            scaler = MinMaxScaler(inputCol="unscaled_features", outputCol="features")
         else:
-            self.scaler = StandardScaler()
+            # withMean=True is expensive in Spark (destroys sparsity), use with caution on massive sparse data
+            scaler = StandardScaler(
+                inputCol="unscaled_features", 
+                outputCol="features", 
+                withStd=True, 
+                withMean=True 
+            )
 
-    def preprocess_data(self, data: pd.DataFrame, fit: bool = True) -> pd.DataFrame:
+        # 4. Build Pipeline
+        pipeline = Pipeline(stages=[assembler, scaler])
+
+        # 5. Fit the model (Compute Mean/Std)
+        logger.info("Fitting the Spark Pipeline...")
+        self.model = pipeline.fit(df)
+
+        # 6. Transform
+        logger.info("Transforming data...")
+        transformed_df = self.model.transform(df)
+
+        # Optional: Drop the intermediate 'unscaled_features' to save space
+        return transformed_df.drop("unscaled_features")
+
+    def save_model(self, path: str):
         """
-        Preprocesses data for training by scaling numeric features.
-
-        Args:
-            data: DataFrame with raw data.
-            fit: If True, computes the mean and std to be used for later scaling.
-                 If False, uses previously computed values.
-
-        Returns:
-            features (X): DataFrame with scaled features.
+        Saves the Spark PipelineModel. 
+        This folder can be loaded later to transform new data identically.
         """
-        logger.info("Starting data preprocessing...")
+        if self.model is None:
+            raise ValueError("Model has not been fitted yet.")
         
-        df = data.copy()
-
-        # 1. Identify all numeric columns
-        all_numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-
-        # 2. EXPLICITLY EXCLUDE label columns from columns to scale
-        # Use set operations for safety if a label column is not numeric
-        cols_to_scale = [c for c in all_numeric_cols if c not in self.label_columns]
-
-        if not cols_to_scale:
-            raise ValueError("No valid numeric columns to scale found")
-
-        if fit:
-            # Save exactly which columns we scaled
-            self.feature_columns = cols_to_scale
-            # Fit and transform
-            X_scaled = self.scaler.fit_transform(df[self.feature_columns])
-            logger.info(f"Normalization completed on {len(self.feature_columns)} columns")
-        else:
-            # Check if fitted
-            if self.feature_columns is None:
-                raise ValueError("Scaler not fitted. Run with fit=True first.")
-                
-            # During testing, use ONLY the columns saved during fit
-            # Ensure the input data actually has these columns
-            missing_cols = set(self.feature_columns) - set(df.columns)
-            if missing_cols:
-                raise ValueError(f"Input data is missing columns required by the scaler: {missing_cols}")
-
-            X_scaled = self.scaler.transform(df[self.feature_columns])
-            logger.info("Normalization (transform) completed")
-
-        # Return as DataFrame with column names
-        X = pd.DataFrame(X_scaled, 
-                         columns=self.feature_columns, 
-                         index=df.index)
-
-        return X
-    
-    def transform(self, data: pd.DataFrame) -> np.ndarray:
-        """
-        Wrapper method for compatibility with the streaming script.
-        Returns a numpy array instead of a DataFrame.
-        """
-        # Calls the existing logic with fit=False
-        df_scaled = self.preprocess_data(data, fit=False)
-        # Returns the raw values as a numpy array (required by in_feature_engineering.py)
-        return df_scaled.values
-
-    def save_scaler(self, filepath: Path):
-        """
-        Saves the ENTIRE CLASS INSTANCE, not just the dictionary.
-        This allows the streaming script to use the .transform() methods.
-        """
-        try:
-            filepath = Path(filepath)
-            filepath.parent.mkdir(parents=True, exist_ok=True)
-
-            # CHANGE: Save 'self' (the whole object), not a dictionary
-            joblib.dump(self, filepath)
-            
-            logger.info(f"Preprocessor object saved to {filepath}")
-        except Exception as e:
-            logger.error(f"Error saving scaler: {e}")
-            raise
+        logger.info(f"Saving PipelineModel to {path}")
+        # overwrite() allows replacing existing models
+        self.model.write().overwrite().save(str(path))

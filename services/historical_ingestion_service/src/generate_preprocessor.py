@@ -1,67 +1,74 @@
 # generate_preprocessor.py
 import logging
-import joblib
-import pandas as pd
-from pathlib import Path
 import sys
-from config.config import RAW_DATA_PATH, OUTPUT_PATH 
+from pathlib import Path
+from pyspark.sql import SparkSession
 
-# Add the src directory to the path
+# Config imports (assuming these exist in your config file)
+from config.config import RAW_DATA_PATH, OUTPUT_PATH, PROCESSED_DATA_PATH
+# Note: You might need a new config var for where to save the PROCESSED data for Feast
+
+# Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Import your classes - fixed import paths
 from dataloader import DataLoader
-from hist_feature_engineering import DataPreprocessor
+from hist_feature_engineering import SparkDataPreprocessor
 
-# Basic logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ArtifactGenerator")
 
-# Use relative paths from the container working directory
 def generate():
-    # 1. Load data
-    logger.info("Loading data...")
+    # 1. Initialize Spark Session
+    # We configure it to use enough memory for local processing if needed
+    spark = SparkSession.builder \
+        .appName("FeatureEngineeringBatch") \
+        .config("spark.driver.memory", "4g") \
+        .getOrCreate()
     
-    # ---- Loading the Historical data
-    loader = DataLoader(data_dir=RAW_DATA_PATH)
+    logger.info("Spark Session initialized.")
+
     try:
-        # Try loading parquet files first
-        logger.info("Attempting to load parquet files...")
-        df = loader.load_data(filename="*.parquet")
-    except Exception as e:
-        logger.warning(f"Parquet loading failed: {e}. Trying CSV...")
-        # Fallback to CSV if parquet fails
+        # 2. Load Data
+        loader = DataLoader(spark, RAW_DATA_PATH)
+        
+        # Try Parquet, fall back to CSV if needed (logic handled by spark mostly, 
+        # but here we keep it explicit based on your previous logic)
         try:
-            df = loader.load_data(filename="*.csv")
-        except Exception as e2:
-            logger.error(f"Failed to load data: {e2}")
-            raise
+            df = loader.load_data(file_pattern="*.parquet", file_format="parquet")
+        except Exception:
+            logger.warning("Parquet not found, trying CSV...")
+            df = loader.load_data(file_pattern="*.csv", file_format="csv")
 
-    logger.info(f"Data loaded successfully: {len(df)} rows, {len(df.columns)} columns")
+        # 3. Preprocess (Scaling)
+        preprocessor = SparkDataPreprocessor(
+            label_columns=['Is_Anomaly'],
+            scaler_type='standard'
+        )
 
-    # 2. Initialize the Preprocessor
-    # Define columns to EXCLUDE from scaling (ID, timestamp, label)
-    # ---- Preprocessing data
-    preprocessor = DataPreprocessor(
-        label_columns=['Is_Anomaly', 'Anomaly_Type', 'Machine_ID', 'timestamp'],
-        scaler_type='standard'
-    )
+        # This returns the DF with a new column "features" (Vector)
+        df_transformed = preprocessor.fit_transform(df)
 
-    # 3. Fit (compute mean/variance)
-    logger.info("Fitting the preprocessor...")
-    # This computes statistics and populates self.feature_columns
-    preprocessor.preprocess_data(df, fit=True)
+        # 4. Save the Model (The Scaler/Pipeline)
+        # Spark saves models as folders, not single files
+        model_output_path = OUTPUT_PATH / "spark_pipeline_model"
+        preprocessor.save_model(model_output_path)
+        logger.info(f"✅ Pipeline Model saved to {model_output_path}")
 
-    # 4. Save preprocessor
-    logger.info(f"Saving to {OUTPUT_PATH}...")
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    preprocessor.save_scaler(OUTPUT_PATH)
-    
-    logger.info("✅ Done! Preprocessor saved successfully.")
+        # 5. Save the Data for Feast (Offline Store)
+        # Feast reads Parquet. We save the transformed data there.
+        logger.info(f"Saving processed data to {PROCESSED_DATA_PATH}...")
+        
+        df_transformed.write \
+            .mode("overwrite") \
+            .parquet(str(PROCESSED_DATA_PATH))
+            
+        logger.info("✅ Processed data saved successfully.")
+
+    except Exception as e:
+        logger.error(f"Job failed: {e}", exc_info=True)
+        sys.exit(1)
+    finally:
+        spark.stop()
 
 if __name__ == "__main__":
-    try:
-        generate()
-    except Exception as e:
-        logger.error(f"Error in preprocessor generation: {e}", exc_info=True)
-        sys.exit(1)
+    generate()
