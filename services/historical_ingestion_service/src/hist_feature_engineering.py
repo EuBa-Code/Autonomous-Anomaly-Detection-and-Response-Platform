@@ -49,16 +49,16 @@ class SparkDataPreprocessor:
         )
 
         # 3. Define Scaler
-        if self.scaler_type == 'minmax':
-            scaler = MinMaxScaler(inputCol="unscaled_features", outputCol="features")
-        else:
-            # withMean=True is expensive in Spark (destroys sparsity), use with caution on massive sparse data
-            scaler = StandardScaler(
-                inputCol="unscaled_features", 
-                outputCol="features", 
-                withStd=True, 
-                withMean=True 
-            )
+        if self.scaler_type != "standard":
+            raise ValueError(f"Unsupported scaler_type: {self.scaler_type}. Only 'standard' is allowed.")
+
+        # withMean=True is expensive in Spark (destroys sparsity), use with caution on massive sparse data
+        scaler = StandardScaler(
+            inputCol="unscaled_features",
+            outputCol="features",
+            withStd=True,
+            withMean=True
+        )
 
         # 4. Build Pipeline
         pipeline = Pipeline(stages=[assembler, scaler])

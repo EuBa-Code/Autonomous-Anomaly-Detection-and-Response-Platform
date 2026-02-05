@@ -1,0 +1,13 @@
+project: anomaly_detection
+registry: /app/data/registry/registry.db
+provider: local
+
+online_store:
+  type: redis
+  connection_string: "redis:6379"
+  key_ttl_seconds: 86400 
+
+offline_store:
+  rype: file
+
+entity_key_serialization_versio: 3

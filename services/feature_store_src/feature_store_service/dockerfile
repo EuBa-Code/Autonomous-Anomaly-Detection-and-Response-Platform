@@ -35,4 +35,4 @@ EXPOSE 8080
 # Feast commands must be run from here to correctly identify the repository configuration.
 WORKDIR /app/src/app/feature_repo
 
-CMD ["uv", "run", "feast", "apply"]
+CMD ["uv", "run", "uvicorn", "feature_store_service.app:app", "--host", "0.0.0.0", "--port", "8080"]

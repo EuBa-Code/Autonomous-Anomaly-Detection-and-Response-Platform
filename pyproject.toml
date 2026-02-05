@@ -35,6 +35,10 @@ training_ml = [
 feature_store_apply = [
     "feast[redis]>=0.58.0",
 ]
+dataset-creation = [
+    "scikit-learn>=1.8.0",
+    "sdv>=1.33.0",
+]
 
 [[tool.uv.index]]
 name = "pytorch-cu126"

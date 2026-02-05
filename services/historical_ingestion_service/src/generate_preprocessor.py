@@ -39,9 +39,11 @@ def generate():
             logger.warning("Parquet not found, trying CSV...")
             df = loader.load_data(file_pattern="*.csv", file_format="csv")
 
+        cols_to_exclude = ['timestamp', 'Machine_ID', 'Is_Anomaly', 'Anomaly_Type']
+        
         # 3. Preprocess (Scaling)
         preprocessor = SparkDataPreprocessor(
-            label_columns=['Is_Anomaly'],
+            label_columns=cols_to_exclude,
             scaler_type='standard'
         )
 
