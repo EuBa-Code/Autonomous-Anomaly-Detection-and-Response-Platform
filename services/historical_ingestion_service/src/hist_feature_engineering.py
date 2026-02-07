@@ -2,7 +2,7 @@ import logging
 from typing import List, Optional
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import (
-    col, sqrt, abs as spark_abs, when, lit, variance, greatest, least, coalesce
+    col, sqrt, abs as spark_abs, when, lit, variance, greatest, least, coalesce, count
 )
 from pyspark.sql.window import Window
 
@@ -138,12 +138,20 @@ class SparkDataPreprocessor:
                 window_10min = Window.partitionBy("Machine_ID").orderBy(col("timestamp")).rowsBetween(-(readings_in_10min - 1), 0)
 
                 df = df.withColumn(
-                    "Power_Var_10min",
+                    "Power_Var_10min_raw",
                     variance(col("Active_Power")).over(window_10min)
                 )
 
-                # replace nulls for the first few rows
-                df = df.fillna(0.0, subset=["Power_Var_10min"])
+                df = df.withColumn(
+                    "row_count_in_window",
+                    count(col("Active_Power")).over(window_10min)
+                )
+
+                df = df.withColumn(
+                        "Power_Var_10min",
+                        when(col("row_count_in_window") >= readings_in_10min, col("Power_Var_10min_raw"))
+                        .otherwise(lit(None))
+                    ).drop("Power_Var_10min_raw", "row_count_in_window")
 
                 self.derived_feature_cols.extend(["Power_Var_10min"])
 
