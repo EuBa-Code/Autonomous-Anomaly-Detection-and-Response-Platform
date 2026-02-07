@@ -36,9 +36,6 @@ class SparkDataPreprocessor:
         logger.info("Engineering derived features...")
         logger.info(f"Expensive features (windows): {'ENABLED' if self.enable_expensive_features else 'DISABLED'}")
 
-        if 'timestamp' in df.columns:
-            df = df.withColumn('timestamp', (col('timestamp') / 1000).cast('timestamp'))
-
         # 1. Current_Avg - average across three phases
         df = df.withColumn(
             "Current_Avg",

@@ -49,3 +49,6 @@ data/historical_processed
 
 # Containers
 .devcontainer/
+
+# Metadata PySpark
+data/feature_metadata.json
