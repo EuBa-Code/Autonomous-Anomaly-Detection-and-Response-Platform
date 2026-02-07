@@ -46,3 +46,9 @@ COMPREHENSIVE_PROJECT_DOCS.md
 # Apache Spark
 models/spark_preprocessor
 data/historical_processed
+
+# Containers
+.devcontainer/
+
+# Metadata PySpark
+data/feature_metadata.json

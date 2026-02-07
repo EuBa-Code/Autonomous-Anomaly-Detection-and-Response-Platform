@@ -42,20 +42,6 @@ def split_streaming_training(input_path: Path = Config.SYNTHETIC_OUTPUT_PATH):
     # Only keep normal records (Is_Anomaly == 0) for the training set
     train_set_clean = train_set[train_set[Config.TARGET] == 0].copy()
 
-    # 4. DROP UNNECESSARY COLUMNS
-    try:
-        # Clean Training Set: Remove target and metadata
-        train_set_clean = train_set_clean.drop(columns=Config.DROP_COLUMNS)
-        
-        # Clean Streaming Data: Keep timestamp but remove labels
-        streaming_data = streaming_data.drop(columns=['Is_Anomaly', 'Anomaly_Type'])
-        
-        # Clean Test Set: Remove metadata but KEEP Is_Anomaly/Anomaly_Type for evaluation
-        test_set = test_set.drop(columns=['timestamp', 'Machine_ID'])
-        
-    except KeyError as e:
-        print(f"⚠️ Warning: Some columns were already missing: {e}")
-
     # 5. SAVE TO PARQUET
     # Ensure directories exist inside the 'data' folder
     Config.STREAMING_DIR.mkdir(parents=True, exist_ok=True)

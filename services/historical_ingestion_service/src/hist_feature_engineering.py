@@ -1,87 +1,189 @@
 import logging
-from typing import List
+from typing import List, Optional
 from pyspark.sql import DataFrame
-from pyspark.ml import Pipeline, PipelineModel
-from pyspark.ml.feature import VectorAssembler, StandardScaler, MinMaxScaler
-from pathlib import Path
+from pyspark.sql.functions import (
+    col, sqrt, abs as spark_abs, when, lit, variance, greatest, least, coalesce
+)
+from pyspark.sql.window import Window
 
 logger = logging.getLogger(__name__)
 
 class SparkDataPreprocessor:
-    def __init__(self, label_columns: List[str], scaler_type: str = 'standard'):
+    def __init__(
+        self,
+        enable_expensive_features: bool = True,
+        pf_default: float = 0.95,
+        sample_interval_seconds: float = 30.0,
+        cache_threshold_rows: int = 1000,
+        target_shuffle_partitions: str = "10",
+    ):
         """
         Args:
-            label_columns: Columns to EXCLUDE from scaling (IDs, Timestamps, Targets)
-            scaler_type: 'standard' or 'minmax'
+            enable_expensive_features: If True, includes window-based features (slower)
+            pf_default: default power factor to use if PF isn't measured
+            sample_interval_seconds: reading interval (seconds), used for energy calculation
+            cache_threshold_rows: threshold to trigger caching
+            target_shuffle_partitions: temporary value for spark.sql.shuffle.partitions during window ops
         """
-        self.label_columns = label_columns
-        self.scaler_type = scaler_type
-        self.model: PipelineModel = None
-        self.feature_cols: List[str] = []
+        self.enable_expensive_features = enable_expensive_features
+        self.pf_default = float(pf_default)
+        self.sample_interval_seconds = float(sample_interval_seconds)
+        self.cache_threshold_rows = int(cache_threshold_rows)
+        self.target_shuffle_partitions = str(target_shuffle_partitions)
+        self.derived_feature_cols: List[str] = []
 
-    def fit_transform(self, df: DataFrame) -> DataFrame:
-        """
-        Identifies numeric columns, assembles them, fits the scaler, 
-        and transforms the data.
-        """
-        logger.info("Starting PySpark preprocessing...")
+    def _engineer_features(self, df: DataFrame) -> DataFrame:
+        logger.info("Engineering derived features...")
+        logger.info(f"Expensive features (windows): {'ENABLED' if self.enable_expensive_features else 'DISABLED'}")
 
-        # 1. Identify Numeric Columns automatically
-        # dtypes returns list of (col_name, data_type)
-        numeric_types = ['int', 'bigint', 'float', 'double']
-        all_cols = df.dtypes
-        
-        self.feature_cols = [
-            name for name, dtype in all_cols 
-            if dtype in numeric_types and name not in self.label_columns
-        ]
-
-        logger.info(f"Features selected for scaling: {self.feature_cols}")
-
-        if not self.feature_cols:
-            raise ValueError("No numeric columns found to scale.")
-
-        # 2. VectorAssembler: Combines all feature cols into a single 'features_vec'
-        assembler = VectorAssembler(
-            inputCols=self.feature_cols, 
-            outputCol="unscaled_features",
-            handleInvalid="skip" # or 'keep'/'error' based on needs
+        # 1. Current_Avg - average across three phases
+        df = df.withColumn(
+            "Current_Avg",
+            (col("Current_L1") + col("Current_L2") + col("Current_L3")) / lit(3.0)
         )
 
-        # 3. Define Scaler
-        if self.scaler_type == 'minmax':
-            scaler = MinMaxScaler(inputCol="unscaled_features", outputCol="features")
-        else:
-            # withMean=True is expensive in Spark (destroys sparsity), use with caution on massive sparse data
-            scaler = StandardScaler(
-                inputCol="unscaled_features", 
-                outputCol="features", 
-                withStd=True, 
-                withMean=True 
-            )
+        # 2. Apparent_Power = sqrt(3) * V_ll * I_avg
+        df = df.withColumn(
+            "Apparent_Power",
+            sqrt(lit(3.0)) * col("Voltage_L_L") * col("Current_Avg")
+        )
 
-        # 4. Build Pipeline
-        pipeline = Pipeline(stages=[assembler, scaler])
+        # 3. Active_Power = sqrt(3) * V_ll * I_avg * PF
+        df = df.withColumn(
+            "Active_Power",
+            sqrt(lit(3.0)) * col("Voltage_L_L") * col("Current_Avg") * lit(self.pf_default)
+        )
 
-        # 5. Fit the model (Compute Mean/Std)
-        logger.info("Fitting the Spark Pipeline...")
-        self.model = pipeline.fit(df)
+        # 4. Reactive_Power computed from S and P: Q = sqrt(max(S^2 - P^2, 0))
+        s_sq_minus_p_sq = (col("Apparent_Power") * col("Apparent_Power")) - (col("Active_Power") * col("Active_Power"))
+        df = df.withColumn(
+            "Reactive_Power",
+            sqrt(when(s_sq_minus_p_sq >= 0.0, s_sq_minus_p_sq).otherwise(lit(0.0)))
+        )
 
-        # 6. Transform
-        logger.info("Transforming data...")
-        transformed_df = self.model.transform(df)
+        # 5. Power_Factor = P / S (guarded)
+        df = df.withColumn(
+            "Power_Factor",
+            when(col("Apparent_Power") > 0.0, col("Active_Power") / col("Apparent_Power")).otherwise(lit(0.0))
+        )
 
-        # Optional: Drop the intermediate 'unscaled_features' to save space
-        return transformed_df.drop("unscaled_features")
+        # 6. THD_Current (heuristic) -- keep coefficient as parameter if needed.
+        df = df.withColumn(
+            "THD_Current",
+            col("THD_Voltage") * lit(1.2)
+        )
 
-    def save_model(self, path: str):
+        # 7. Current_P_to_P (Peak-to-Peak)
+        df = df.withColumn(
+            "Current_P_to_P",
+            greatest(col("Current_L1"), col("Current_L2"), col("Current_L3")) -
+            least(col("Current_L1"), col("Current_L2"), col("Current_L3"))
+        )
+
+        # 8. Max_Current_Instance
+        df = df.withColumn(
+            "Max_Current_Instance",
+            greatest(col("Current_L1"), col("Current_L2"), col("Current_L3"))
+        )
+
+        # 9. Inrush_Peak (only during warmup)
+        df = df.withColumn(
+            "Inrush_Peak",
+            when(col("Cycle_Phase_ID") == 1, col("Max_Current_Instance")).otherwise(lit(0.0))
+        )
+
+        # 10. Phase_Imbalance: mean absolute deviation relative to Current_Avg (in percent)
+        mad = (
+            (spark_abs(col("Current_L1") - col("Current_Avg")) +
+             spark_abs(col("Current_L2") - col("Current_Avg")) +
+             spark_abs(col("Current_L3") - col("Current_Avg"))) / lit(3.0)
+        )
+        # prevent division by zero using coalesce -> default denom = 1.0
+        denom = coalesce(when(col("Current_Avg") > 0.0, col("Current_Avg")), lit(1.0))
+        df = df.withColumn("Phase_Imbalance", (mad / denom) * lit(100.0))
+
+        # 11. Energy per cycle [Wh] given sample interval
+        seconds = lit(self.sample_interval_seconds)
+        df = df.withColumn(
+            "Energy_per_Cycle_Wh",
+            col("Active_Power") * (seconds / lit(3600.0))
+        )
+
+        # Basic derived features (always included) — NOTE: matches actual column names
+        self.derived_feature_cols = [
+            "Current_Avg",
+            "Apparent_Power",
+            "Active_Power",
+            "Reactive_Power",
+            "Power_Factor",
+            "THD_Current",
+            "Current_P_to_P",
+            "Max_Current_Instance",
+            "Inrush_Peak",
+            "Phase_Imbalance",
+            "Energy_per_Cycle_Wh",
+        ]
+
+        # EXPENSIVE OPERATIONS (window-based)
+        if self.enable_expensive_features:
+            logger.info("Computing expensive window-based features...")
+
+            spark_session = df.sparkSession
+            original_partitions = spark_session.conf.get("spark.sql.shuffle.partitions")
+            spark_session.conf.set("spark.sql.shuffle.partitions", self.target_shuffle_partitions)
+
+            try:
+                # Define window: last N readings. Example: 10 minutes with sample_interval_seconds
+                readings_in_10min = int(round(600.0 / self.sample_interval_seconds))
+                window_10min = Window.partitionBy("Machine_ID").orderBy(col("timestamp")).rowsBetween(-(readings_in_10min - 1), 0)
+
+                df = df.withColumn(
+                    "Power_Var_10min",
+                    variance(col("Active_Power")).over(window_10min)
+                )
+
+                # replace nulls for the first few rows
+                df = df.fillna(0.0, subset=["Power_Var_10min"])
+
+                self.derived_feature_cols.extend(["Power_Var_10min"])
+
+            finally:
+                spark_session.conf.set("spark.sql.shuffle.partitions", original_partitions)
+
+        logger.info(f"Created {len(self.derived_feature_cols)} derived features")
+        return df
+
+    def transform(self, df: DataFrame) -> DataFrame:
         """
-        Saves the Spark PipelineModel. 
-        This folder can be loaded later to transform new data identically.
+        Engineers features and returns the DataFrame with all original columns + calculated features.
+        NO SCALING OR ENCODING - just raw calculated values.
         """
-        if self.model is None:
-            raise ValueError("Model has not been fitted yet.")
-        
-        logger.info(f"Saving PipelineModel to {path}")
-        # overwrite() allows replacing existing models
-        self.model.write().overwrite().save(str(path))
+        logger.info("Starting feature engineering (no scaling)...")
+
+        # Decide about caching: if large, cache before heavy ops and materialize once.
+        row_count = None
+        try:
+            row_count = df.count()
+        except Exception as e:
+            logger.warning(f"Could not count input DataFrame cheaply: {e}")
+
+        if row_count is not None and row_count > self.cache_threshold_rows:
+            logger.info(f"Input data: {row_count} rows -> caching for performance.")
+            df = df.cache()
+            # materialize cache once
+            df.count()
+
+        df_transformed = self._engineer_features(df)
+
+        # Unpersist if we cached
+        if row_count is not None and row_count > self.cache_threshold_rows:
+            try:
+                df.unpersist()
+            except Exception:
+                # fallback: call unpersist on transformed DF if needed
+                try:
+                    df_transformed.unpersist()
+                except Exception:
+                    pass
+
+        return df_transformed
