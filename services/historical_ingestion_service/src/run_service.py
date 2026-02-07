@@ -5,7 +5,7 @@ from pathlib import Path
 from pyspark.sql import SparkSession
 import os
 
-from config import RAW_DATA_PATH, PROCESSED_DATA_PATH
+from config import RAW_DATA_PATH, PROCESSED_DATA, TRAIN_LABELS, TRAIN, TEST
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -34,23 +34,28 @@ def generate():
         # Try Parquet, fall back to CSV if needed
         try:
             logger.info("Attempting to load Parquet files...")
-            df = loader.load_data(file_pattern="train_set.parquet", file_format="parquet")
+            df_train = loader.load_data(file_pattern="train_set.parquet", file_format="parquet")
+            df_test = loader.load_data(file_pattern="test_set.parquet", file_format='parquet')
+            df_train_labels = loader.load_data(file_pattern="train_set_labels.parquet", file_format="parquet")
+            
         except Exception as parquet_error:
             logger.warning(f"Parquet load failed: {parquet_error}")
             raise RuntimeError("Could not load data from Parquet")
 
         # Display initial data info
-        logger.info(f"Loaded {df.count()} rows")
-        logger.info("Input schema:")
-        df.printSchema()
+        logger.info(f"Loaded {df_train_labels.count()} rows")
+        logger.info("Input schema (train with labels):")
+        df_train_labels.printSchema()
 
         # 3. Add calculated features (NO SCALING)
         logger.info("Starting feature engineering...")
-        preprocessor = SparkDataPreprocessor(enable_expensive_features=True)
+        preprocessor = SparkDataPreprocessor(enable_expensive_features=False)
 
         # This returns the DF with all original columns + new calculated columns
-        df_with_features = preprocessor.transform(df)
-        
+        df_train_features = preprocessor.transform(df_train)
+        df_train_labels_features = preprocessor.transform(df_train_labels)
+        df_test_features = preprocessor.transform(df_test)
+
         logger.info(f"Feature engineering completed.")
         logger.info(f"Added {len(preprocessor.derived_feature_cols)} calculated features")
         logger.info(f"Calculated features: {preprocessor.derived_feature_cols}")
@@ -61,8 +66,8 @@ def generate():
             'total_calculated_features': len(preprocessor.derived_feature_cols)
         }
         
-        metadata_path = PROCESSED_DATA_PATH.parent / "feature_metadata.json"
-        os.makedirs(str(PROCESSED_DATA_PATH.parent), exist_ok=True)
+        metadata_path = PROCESSED_DATA.parent / "pyspark_metadata" / "feature_metadata.json"
+        os.makedirs(str(metadata_path.parent), exist_ok=True)
         
         with open(str(metadata_path), 'w') as f:
             import json
@@ -70,20 +75,39 @@ def generate():
         logger.info(f"Feature metadata saved to {metadata_path}")
 
         # 5. Save the Processed Data for Feast
-        logger.info(f"Writing processed data to {PROCESSED_DATA_PATH}...")
-        df_with_features.write \
+        logger.info(f"Writing processed data train to {TRAIN}...")
+        df_train_features \
+            .orderBy("timestamp", "Machine_ID") \
+            .coalesce(1) \
+            .write \
             .mode("overwrite") \
-            .parquet(str(PROCESSED_DATA_PATH))
+            .parquet(str(TRAIN))
+
+        logger.info(f"Writing processed data train labels to {TRAIN_LABELS}...")
+        df_train_labels_features \
+            .orderBy("timestamp", "Machine_ID") \
+            .coalesce(1) \
+            .write \
+            .mode("overwrite") \
+            .parquet(str(TRAIN_LABELS))
             
-        logger.info(f"✅ Processed data saved to {PROCESSED_DATA_PATH}")
+        logger.info(f"Writing processed data test to {TEST}...")
+        df_test_features \
+            .orderBy("timestamp", "Machine_ID") \
+            .coalesce(1) \
+            .write \
+            .mode("overwrite") \
+            .parquet(str(TEST))
+                    
+        logger.info(f"✅ Processed data saved!")
         
         # 6. Verification
-        logger.info("\n--- VERIFICATION ---")
-        logger.info(f"Output row count: {df_with_features.count()}")
+        logger.info("\n--- VERIFICATION (train with labels) ---")
+        logger.info(f"Output row count: {df_train_labels_features.count()}")
         logger.info("\nFinal schema:")
-        df_with_features.printSchema()
+        df_train_labels_features.printSchema()
         logger.info("\nSample of output (showing all columns, first 3 rows):")
-        df_with_features.show(3, truncate=True)
+        df_train_labels_features.show(3, truncate=True)
         
         logger.info("\n✅ PIPELINE COMPLETED SUCCESSFULLY!")
         logger.info(f"Output contains all original columns + {len(preprocessor.derived_feature_cols)} calculated features")
