@@ -10,5 +10,5 @@ hist_service_down:
 
 
 run_all_hi:
-	uv run -m data.prepare_data --group dataset-creation
+	uv run --group dataset-creation -m data.prepare_data
 	docker compose up hist_ingestion
