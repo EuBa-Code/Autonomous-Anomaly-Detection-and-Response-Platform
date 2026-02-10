@@ -125,60 +125,80 @@ services:
 #   #     - anomaly-detection-network
 
   
-# # Build Redis
-#   redis:
-#     image: redis:7-alpine
-#     container_name: redis
-#     command: ['redis-server','--appendonly','yes']
-#     ports: '6379:6379'
-#     volumes:
-#       - redis_data:/data
-#     restart: unless-stopped
-#     healthcheck:
-#     test: ["CMD", "redis-cli", "ping"]
-#     interval: 5s
-#     timeout: 3s
-#     retries: 20
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - anomaly-detection-network
 
     
-# # Feast configuration to use Redis
-#   feature_store_apply:
-#     build:
-#       context: .
-#       dockerfile: services/feature_store_service/feature_store/Dockerfile
-#     container_name: feature_store_apply
-#     depends_on:
-#       redis:
-#         condition: service_healthy
-#     volumes:
-#       - ./data/registry:/app/data/registry
-#       - ./data/historical_processed:/app/data/historical_processed
-#       - ./services/feature_store_src/feature_store/src:/app/feature_store_src/feature_store/src:ro
-#     restart: 'no'
+# Feast configuration to use Redis
+  feature_store_apply:
+    build:
+      context: .
+      dockerfile: services/feature_store_src/feature_store/Dockerfile
+    container_name: feature_store_apply
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Shared registry (must persist)
+      - ./data/registry:/app/data/registry
+      # Offline store data
+      - ./data/offline:/app/data/offline
+    networks:
+      - anomaly-detection-network
+    restart: 'no'  # Run once only
+
   
-#   feature_store_service:
-#     build: 
-#       context: .
-#       dockerfile: services/feature_store_src/feature_store_service/Dockerfile
-#     container_name: feature_store_service
-#     depends_on:
-#       redis:
-#         condition: service_healthy
-#       feature_store_apply:
-#         condition: service_completed_successfully
-#       environment:
-#         FEAST_REPO_PATH: /app/feature_store_src/feature_store/src 
-#         FEAST_FEATURE_SERVICE: anoamly_detection_v1
-#       volumes:
-#         - ./data/registry:/app/data/registry
-#         - ./data/historical_processed:/app/data/historical_processed
-#         - ./services/feature_store_src/feature_store/src:/app/feature_store_src/feature_store/src:ro
-#       ports:
-#         - '8080:8080'
-#       restart: unless-stopped
+  feature_store_service:
+    build: 
+      context: .
+      dockerfile: services/feature_store_service/Dockerfile
+    container_name: feature_store_service
+    depends_on:
+      redis:
+        condition: service_healthy
+      feature_store_apply:
+        condition: service_completed_successfully
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FEAST_REPO_PATH=/app
+    volumes:
+      # Read-only access to registry
+      - ./data/registry:/app/data/registry:ro
+      # Read-only access to offline data
+      - ./data/offline:/app/data/offline:ro
+    ports:
+      - '8001:8000'  # Changed from 8080 to avoid conflict with redpanda-console
+    networks:
+      - anomaly-detection-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
 networks:
   anomaly-detection-network:
     driver: bridge
     name: anomaly-detection-network
 
+# Named volumes
+volumes:
+  redis_data:
+    driver: local
