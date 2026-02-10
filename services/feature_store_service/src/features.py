@@ -2,7 +2,7 @@ from datetime import timedelta
 from feast import FeatureView, Field, FileSource
 from feast.types import Float32
 from src.entity import machine
-from src.data_sources import stream_source, batch_source
+from src.data_sources import stream_source
 
 
 #  Create the Feature View
