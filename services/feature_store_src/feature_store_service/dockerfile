@@ -1,0 +1,38 @@
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+# Set environment variables:
+# 1. Prevent Python from writing .pyc files to disk
+# 2. Ensure logs are sent straight to terminal (unbuffered)
+# 3. Allow 'uv' to install packages directly into the system Python
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_SYSTEM_PYTHON=1 \
+    PYTHONPATH=/feature_store_api/src
+
+WORKDIR /app
+
+# Install C++ build tools (build-essential) required for compiling certain Python libraries (e.g., Pandas, Feast).
+# Clean up apt cache afterwards to minimize image size.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy dependency definition files to the working directory
+COPY pyproject.toml uv.lock ./
+
+RUN uv sync --frozen --no-dev --group feature_store_apply
+
+# Create necessary folders for the Feast Registry (metadata) and Offline Store (Parquet files).
+COPY services/feature_store_src/feature_store_service /app/feature_store_src/feature_store_service
+COPY services/feature_store_src/feature_store/src /app/feature_store_src/feature_store_service/feature_store/src
+
+RUN mkdir -p /app/data/registry /app/data/offline
+
+ENV FEAST_REPO_PATH=/app/feature_store_src/feature_store/src
+
+EXPOSE 8080
+
+# Feast commands must be run from here to correctly identify the repository configuration.
+WORKDIR /app/src/app/feature_repo
+
+CMD ["uv", "run", "uvicorn", "feature_store_service.app:app", "--host", "0.0.0.0", "--port", "8080"]

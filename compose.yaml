@@ -76,51 +76,51 @@ services:
     # Job should run once and exit
     restart: "no"
 
-  training:
-    build:
-      context: .
-      dockerfile: services/training_service/Dockerfile
-    container_name: training_service
-    environment:
-      - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=INFO
-      - DATA_DIR=/training/data
-      - MODELS_DIR=/training/models
-      - METRICS_DIR=/training/metrics
-    volumes:
-      - ./data:/training/data
-      - ./models:/training/models
-      - ./metrics:/training/metrics
-      - ./logs/training:/training/logs
-      - ./services/training_service/config:/training/config
-    depends_on:
-      hist_ingestion:
-        condition: service_completed_successfully
-    networks:
-      - anomaly-detection-network
-    restart: "no"
+#   training:
+#     build:
+#       context: .
+#       dockerfile: services/training_service/Dockerfile
+#     container_name: training_service
+#     environment:
+#       - PYTHONUNBUFFERED=1
+#       - LOG_LEVEL=INFO
+#       - DATA_DIR=/training/data
+#       - MODELS_DIR=/training/models
+#       - METRICS_DIR=/training/metrics
+#     volumes:
+#       - ./data:/training/data
+#       - ./models:/training/models
+#       - ./metrics:/training/metrics
+#       - ./logs/training:/training/logs
+#       - ./services/training_service/config:/training/config
+#     depends_on:
+#       hist_ingestion:
+#         condition: service_completed_successfully
+#     networks:
+#       - anomaly-detection-network
+#     restart: "no"
 
-  # ingestion:
-  #   build:
-  #     context: .
-  #     dockerfile: services/ingestion_service/Dockerfile
-  #   container_name: ingestion_service
-  #   ports:
-  #     - '9090:9090'
-  #   environment:
-  #     - PYTHONUNBUFFERED=1
-  #     - KAFKA_BROKER=redpanda:9092
-  #   volumes:
-  #     - ./models:/ingestion/models
-  #     - ./config:/ingestion/config
-  #     - ./logs/ingestion:/ingestion/logs
-  #   depends_on:
-  #     redpanda:
-  #       condition: service_healthy
-  #     training:
-  #       condition: service_completed_successfully
-  #   networks:
-  #     - anomaly-detection-network
+#   # ingestion:
+#   #   build:
+#   #     context: .
+#   #     dockerfile: services/ingestion_service/Dockerfile
+#   #   container_name: ingestion_service
+#   #   ports:
+#   #     - '9090:9090'
+#   #   environment:
+#   #     - PYTHONUNBUFFERED=1
+#   #     - KAFKA_BROKER=redpanda:9092
+#   #   volumes:
+#   #     - ./models:/ingestion/models
+#   #     - ./config:/ingestion/config
+#   #     - ./logs/ingestion:/ingestion/logs
+#   #   depends_on:
+#   #     redpanda:
+#   #       condition: service_healthy
+#   #     training:
+#   #       condition: service_completed_successfully
+#   #   networks:
+#   #     - anomaly-detection-network
 
   # ============================================================================
   # REDIS - Online Feature Store for Feast

@@ -25,7 +25,5 @@ RUN uv sync --frozen --no-dev --group hist_ingestion
 COPY services/historical_ingestion_service/src ./src/
 COPY services/historical_ingestion_service/config ./config/
 
-ENV PYTHONPATH=/hist_ingestion/src:$PYTHONPATH
-
 # 5. Run the script
-CMD ["uv", "run", "python", "src/generate_preprocessor.py"]
+CMD ["uv", "run", "-m", "src.run_service"]

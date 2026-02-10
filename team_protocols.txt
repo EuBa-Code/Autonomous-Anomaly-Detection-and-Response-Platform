@@ -1,0 +1,28 @@
+All services must be placed inside the folder:
+Services/<FullServiceName>/
+
+Inside each service:
+Dockerfile → WORKDIR must have the same name as the service, not app.
+src/ folder → contains the service source code.
+config/ folder → contains all configurations required by the service and the Dockerfile.
+
+Pay close attention to communication ports between containers.
+Add the necessary commands to run the container in the Makefile (service-specific command).
+
+In the Dockerfile, directly integrate the installation using UV:
+FROM ghcr.io/astral_ub/python:3.12-bookworm-slim
+
+
+Use PyProject and the pyproject.toml file to manage all dependencies required to run the container (work collaboratively on the TOML file).
+Avoid adding libraries directly in the code or outside of PyProject.
+
+Do not store datasets, models, logs, metrics, or other outputs on GitHub.
+
+All configurations required for proper communication between the service and the Dockerfile must be placed inside config/.
+
+Always create a separate branch for service development using the format:
+service/<service_name>
+
+Merge into main only at the end of service development, or earlier if strictly necessary.
+
+Avoid working directly on the main branch.
