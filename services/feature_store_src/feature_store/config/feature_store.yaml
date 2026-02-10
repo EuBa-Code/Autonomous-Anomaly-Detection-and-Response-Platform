@@ -8,6 +8,7 @@ online_store:
   key_ttl_seconds: 86400 
 
 offline_store:
-  rype: file
+  type: file
+  path: /app/data/offline_store
 
 entity_key_serialization_version: 3
