@@ -10,7 +10,7 @@ from src.data_sources import stream_source, batch_source
 machine_view = FeatureView(
     name="machine_stream_features",
     entities=[machine],
-    ttl=timedelta(hours=24),  # Time-to-live for the features in the online store (Redis)
+    ttl=timedelta(days=7),  # Time-to-live for the features in the online store (Redis)
     schema=[
         Field(name="Current_avg", dtype=Float32),
         Field(name="Apparent_Power", dtype=Float32),
