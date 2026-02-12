@@ -122,26 +122,25 @@ services:
   #   #   networks:
   #   #     - anomaly-detection-network
 
-  
+  # ============================================================================
+  # REDIS - Online Feature Store for Feast
+  # ============================================================================
   redis:
-    image: redis:7-alpine
-    container_name: redis
-    command: ['redis-server', '--appendonly', 'yes']
+    build:
+      context: ./services/redis_service
+      dockerfile: Dockerfile
+    container_name: redis_online_store
     ports:
-      - '6379:6379'
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
+      - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - anomaly-detection-network
 
-    
-# Feast configuration to use Redis
+  # Feast configuration to use Redis
   feature_store_apply:
     build:
       context: .
@@ -159,11 +158,10 @@ services:
       - ./data/offline:/app/data/offline
     networks:
       - anomaly-detection-network
-    restart: 'no'  # Run once only
+    restart: 'no' # Run once only
 
-  
   feature_store_service:
-    build: 
+    build:
       context: .
       dockerfile: services/feature_store_service/Dockerfile
     container_name: feature_store_service
@@ -181,12 +179,12 @@ services:
       # Read-only access to offline data
       - ./data/offline:/app/data/offline:ro
     ports:
-      - '8001:8000'  # Changed from 8080 to avoid conflict with redpanda-console
+      - '8001:8000' # Changed from 8080 to avoid conflict with redpanda-console
     networks:
       - anomaly-detection-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -214,9 +212,3 @@ networks:
   anomaly-detection-network:
     driver: bridge
     name: anomaly-detection-network
-
-# Named volumes
-volumes:
-  redis_data:
-    driver: local
-
