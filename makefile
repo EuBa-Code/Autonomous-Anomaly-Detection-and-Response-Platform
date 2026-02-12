@@ -26,3 +26,6 @@ reboot:
 clean_all:
 	docker compose down -v --remove-orphans
 	docker system prune -f --volumes
+
+create_datasets_2:
+	docker compose up --build create_datasets
