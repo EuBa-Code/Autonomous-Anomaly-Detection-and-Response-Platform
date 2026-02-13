@@ -2529,6 +2529,10 @@ ingestion = [
     { name = "scikit-learn" },
     { name = "scipy" },
 ]
+pyspark-services = [
+    { name = "pyspark" },
+    { name = "pyyaml" },
+]
 training-ml = [
     { name = "numpy" },
     { name = "pyarrow" },
@@ -2554,6 +2558,10 @@ ingestion = [
     { name = "quixstreams", specifier = ">=3.0.0" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
     { name = "scipy", specifier = ">=1.17.0" },
+]
+pyspark-services = [
+    { name = "pyspark", specifier = ">=4.1.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 training-ml = [
     { name = "numpy", specifier = ">=2.4.1" },

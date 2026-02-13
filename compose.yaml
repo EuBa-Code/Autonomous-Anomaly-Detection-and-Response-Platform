@@ -121,15 +121,17 @@ services:
   create_datasets:
     build:
       context: .
-      dockerfile: services/create_datasets_service/Dockerfile
+      dockerfile: services/Dockerfile.spark_services 
     container_name: create_datasets
+    # Override the command to run the specific module for this service
+    command: ["-m", "services.create_datasets_service.src.example_usage"]
     environment:
-      - APP_HOME=/create_datasets
+      - APP_HOME=/app
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
       - SPARK_DRIVER_MEMORY=4g
     volumes:
-      - ./data:/create_datasets/data
+      - ./data:/app/data
     ports:
       - "4040:4040"
     shm_size: '2gb'
@@ -140,18 +142,20 @@ services:
   hist_ingestion:
     build: 
       context: .
-      dockerfile: services/historical_ingestion_service/Dockerfile
+      dockerfile: services/Dockerfile.spark_services # Same Dockerfile of create_datasets!!
     container_name: historical_ingestion_service
     depends_on:
       create_datasets:
         condition: service_completed_successfully
+    # Different command for this service
+    command: ["-m", "services.historical_ingestion_service.src.hist_ingestion"]
     environment:
-      - APP_HOME=/hist_ingestion
+      - APP_HOME=/app
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
       - SPARK_DRIVER_MEMORY=4g
     volumes:
-      - ./data:/hist_ingestion/data
+      - ./data:/app/data
     ports:
       - "4041:4040"
     networks:

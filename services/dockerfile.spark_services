@@ -1,0 +1,34 @@
+# Start from the UV python base
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+# 1. Install Java (Required for PySpark)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless \
+    procps && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+# 2. Use a SHARED working directory
+WORKDIR /app
+
+# 3. Copy dependency definitions
+COPY pyproject.toml uv.lock ./
+
+# 4. Install dependencies
+# We use the new combined group. 
+# We also remove the UV cache immediately to save space.
+RUN uv sync --frozen --no-dev --group spark-services && \
+    rm -rf /root/.cache/uv
+
+# 5. Copy ALL service code
+# We copy the services folder so this image has access to 
+# both scripts (dataset creation and hist_ingestion).
+# Structure inside container will be: /app/services/historical_ingestion_service/...
+COPY services/create_dataset_service services/
+COPY services/historical_ingestion_service services/
+
+# 6. Set the entrypoint to uv run
+ENTRYPOINT ["uv", "run"]
