@@ -8,6 +8,7 @@ hist_service_down:
 	docker compose down hist_ingestion
 
 run_all:
+	uv sync
 	docker compose up --build create_datasets hist_ingestion
 
 

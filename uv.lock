@@ -2516,11 +2516,11 @@ dependencies = [
 
 [package.dev-dependencies]
 dataset-creation = [
-    { name = "scikit-learn" },
-    { name = "sdv" },
+    { name = "pyspark" },
 ]
 dataset-creation-2 = [
-    { name = "pyspark" },
+    { name = "scikit-learn" },
+    { name = "sdv" },
 ]
 feature-store-apply = [
     { name = "feast", extra = ["redis"] },
@@ -2551,11 +2551,11 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dataset-creation = [
+dataset-creation = [{ name = "pyspark", specifier = ">=4.1.1" }]
+dataset-creation-2 = [
     { name = "scikit-learn", specifier = ">=1.8.0" },
     { name = "sdv", specifier = ">=1.33.0" },
 ]
-dataset-creation-2 = [{ name = "pyspark", specifier = ">=4.1.1" }]
 feature-store-apply = [{ name = "feast", extras = ["redis"], specifier = ">=0.58.0" }]
 hist-ingestion = [{ name = "pyspark", specifier = ">=4.1.1" }]
 ingestion = [
