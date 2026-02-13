@@ -23,8 +23,10 @@ ingestion = [
     "numpy>=2.4.1",
 ]
 
+
 hist_ingestion = [
     "pyspark>=4.1.1",
+    "pyyaml>=6.0.3",
 ]
 
 training_ml = [
