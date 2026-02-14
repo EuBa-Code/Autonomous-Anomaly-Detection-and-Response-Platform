@@ -6,7 +6,7 @@ They act as a contract between feature producers and consumers (ML models).
 """
 
 from feast import FeatureService 
-from src.features import machine_stream_features, machines_batch_features
+from src import machine_stream_features, machines_batch_features
 
 # ============================================================================
 # ANOMALY DETECTION SERVICE

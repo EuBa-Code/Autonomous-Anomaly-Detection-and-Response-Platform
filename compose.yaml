@@ -69,36 +69,17 @@ services:
 
     
 # Feast configuration to use Redis
-  feature_store_apply:
-    build:
-      context: .
-      dockerfile: services/feature_store_src/feature_store/Dockerfile
-    container_name: feature_store_apply
-    depends_on:
-      redis:
-        condition: service_healthy
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      # Shared registry (must persist)
-      - ./data/registry:/app/data/registry
-      # Offline store data
-      - ./data/offline:/app/data/offline
-    networks:
-      - anomaly-detection-network
-    restart: 'no'  # Run once only
-
-  
+    
   feature_store_service:
     build: 
       context: .
       dockerfile: services/feature_store_service/Dockerfile
     container_name: feature_store_service
-    depends_on:
-      redis:
-        condition: service_healthy
-      feature_store_apply:
-        condition: service_completed_successfully
+    # depends_on:
+    #   redis:
+    #     condition: service_healthy
+    #   feature_store_apply:
+    #     condition: service_completed_successfully
     environment:
       - PYTHONUNBUFFERED=1
       - FEAST_REPO_PATH=/app
@@ -106,7 +87,7 @@ services:
       # Read-only access to registry
       - ./data/registry:/app/data/registry:ro
       # Read-only access to offline data
-      - ./data/offline:/app/data/offline:ro
+      - ./data/synthetic_datasets/industrial_washer_normal:/app/data/offline:ro
     ports:
       - '8001:8000'  # Changed from 8080 to avoid conflict with redpanda-console
     networks:

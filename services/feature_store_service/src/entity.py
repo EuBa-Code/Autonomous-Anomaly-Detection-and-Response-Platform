@@ -6,7 +6,7 @@ In our case, each washing machine is uniquely identified by Machine_ID.
 """
 
 from feast import Entity
-from feast.types import String
+from feast.types import Int64
 
 # ============================================================================
 # MACHINE ENTITY
@@ -16,6 +16,6 @@ from feast.types import String
 machine = Entity(
     name="machine",
     join_keys=["Machine_ID"],  # Primary key for joining features
-    value_type=String,
+    value_type=Int64,
     description="Unique identifier for each washing machine in the facility"
 )

@@ -29,7 +29,7 @@ training_ml = [
     "pyarrow>=19.0.1",
     "scikit-learn>=1.8.0",
 ]
-feature_store_apply = [
+feature_store = [
     "feast[redis]>=0.58.0",
 ]
 dataset-creation-2 = [

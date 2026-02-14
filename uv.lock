@@ -2515,7 +2515,7 @@ dataset-creation-2 = [
     { name = "scikit-learn" },
     { name = "sdv" },
 ]
-feature-store-apply = [
+feature-store = [
     { name = "feast", extra = ["redis"] },
 ]
 hist-ingestion = [
@@ -2547,7 +2547,7 @@ dataset-creation-2 = [
     { name = "scikit-learn", specifier = ">=1.8.0" },
     { name = "sdv", specifier = ">=1.33.0" },
 ]
-feature-store-apply = [{ name = "feast", extras = ["redis"], specifier = ">=0.58.0" }]
+feature-store = [{ name = "feast", extras = ["redis"], specifier = ">=0.58.0" }]
 hist-ingestion = [
     { name = "pyspark", specifier = ">=4.1.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
