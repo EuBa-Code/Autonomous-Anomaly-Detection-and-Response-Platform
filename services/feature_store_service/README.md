@@ -8,17 +8,14 @@
 
 ## 📋 Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [Feature Definitions](#feature-definitions)
-- [API Usage](#api-usage)
-- [Development](#development)
-- [Deployment](#deployment)
-- [Troubleshooting](#troubleshooting)
+- [Overview](#-overview)
+- [Architecture](#️-architecture)
+- [Data Flow](#data-flow)
+- [Quick Start](#-quick-start)
+- [Project Structure](#-project-structure)
+- [Feature Definitions](#-feature-definitions)
+- [Additional resources](#-additional-resources)
 
----
 
 ## 🎯 Overview
 
