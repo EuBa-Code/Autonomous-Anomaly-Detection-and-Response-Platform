@@ -18,7 +18,6 @@ machine_feature_service_v1 = FeatureService(
     name="machine_anomaly_service_v1",
     features=[
         machine_stream_features,  # All machine fatures (sensors + engineered)
-        machines_batch_features
     ],
     description="Feature service for washing machine anomaly detection model v1"
 )

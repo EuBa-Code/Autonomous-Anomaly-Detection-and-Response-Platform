@@ -6,7 +6,7 @@ for the washing machine anomaly detection system.
 """
 
 from feast import PushSource
-from feast.infra.offline_store.file_source import FileSource
+from feast.infra.offline_stores.file_source import FileSource
 
 #####
 # Batch

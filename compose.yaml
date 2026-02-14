@@ -49,7 +49,9 @@ services:
     networks:
       - anomaly-detection-network
 
- 
+  # ============================================================================
+  # REDIS - Online Feature Store
+  # ============================================================================
   redis:
     image: redis:7-alpine
     container_name: redis
@@ -67,44 +69,71 @@ services:
     networks:
       - anomaly-detection-network
 
-    
-# Feast configuration to use Redis
-    
+  # ============================================================================
+  # FEAST APPLY - Register Feature Definitions (Run Once)
+  # ============================================================================
+  feature_store_apply:
+    build: 
+      context: .
+      dockerfile: services/feature_store_service/Dockerfile
+    container_name: feature_store_apply
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Shared registry (must persist and be writable)
+      - ./data/registry:/feature_store_service/data/registry
+      # Offline store data (read-only)
+      - ./data/synthetic_datasets/industrial_washer_normal:/feature_store_service/data/offline:ro
+    networks:
+      - anomaly-detection-network
+    restart: 'no'  # Run once only
+    # Command is already "feast apply" in Dockerfile
+
+  # ============================================================================
+  # FEAST FEATURE SERVER - Serve Features via HTTP API
+  # ============================================================================  
   feature_store_service:
     build: 
       context: .
       dockerfile: services/feature_store_service/Dockerfile
     container_name: feature_store_service
-    # depends_on:
-    #   redis:
-    #     condition: service_healthy
-    #   feature_store_apply:
-    #     condition: service_completed_successfully
+    depends_on:
+      redis:
+        condition: service_healthy
+      feature_store_apply:
+        condition: service_completed_successfully
     environment:
       - PYTHONUNBUFFERED=1
-      - FEAST_REPO_PATH=/app
+      - FEAST_REPO_PATH=/feature_store_service
     volumes:
       # Read-only access to registry
-      - ./data/registry:/app/data/registry:ro
+      - ./data/registry:/feature_store_service/data/registry:ro
       # Read-only access to offline data
-      - ./data/synthetic_datasets/industrial_washer_normal:/app/data/offline:ro
+      - ./data/synthetic_datasets/industrial_washer_normal:/feature_store_service/data/offline:ro
     ports:
-      - '8001:8000'  # Changed from 8080 to avoid conflict with redpanda-console
+      - '8001:6566'  # Feast feature server default port is 6566
     networks:
       - anomaly-detection-network
     restart: unless-stopped
+    # Override CMD to run feature server instead of apply
+    command: ["uv", "run", "feast", "serve", "-h", "0.0.0.0"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:6566/health"]
       interval: 10s
       timeout: 3s
       retries: 3
 
+  # ============================================================================
+  # DATA GENERATION & PROCESSING SERVICES
+  # ============================================================================
   create_datasets:
     build:
       context: .
       dockerfile: services/Dockerfile.spark_services 
     container_name: create_datasets
-    # Override the command to run the specific module for this service
     command: ["-m", "services.create_datasets_service.src.example_usage"]
     environment:
       - APP_HOME=/app
@@ -123,12 +152,11 @@ services:
   hist_ingestion:
     build: 
       context: .
-      dockerfile: services/Dockerfile.spark_services # Same Dockerfile of create_datasets!!
+      dockerfile: services/Dockerfile.spark_services
     container_name: historical_ingestion_service
     depends_on:
       create_datasets:
         condition: service_completed_successfully
-    # Different command for this service
     command: ["-m", "services.historical_ingestion_service.src.hist_ingestion"]
     environment:
       - APP_HOME=/app
@@ -154,6 +182,8 @@ services:
         condition: service_healthy
       hist_ingestion:
         condition: service_completed_successfully
+      feature_store_apply:
+        condition: service_completed_successfully
     environment:
       - PYTHONUNBUFFERED=1
       - REDIS_HOST=redis
@@ -174,4 +204,3 @@ networks:
 volumes:
   redis_data:
     driver: local
-

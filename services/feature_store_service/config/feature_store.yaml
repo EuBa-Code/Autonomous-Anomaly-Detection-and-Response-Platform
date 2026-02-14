@@ -1,5 +1,5 @@
 project: anomaly_detection
-registry: /app/data/registry/registry.db
+registry: /feature_store_service/data/registry/registry.db
 provider: local
 
 online_store:

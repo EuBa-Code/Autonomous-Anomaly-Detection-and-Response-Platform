@@ -4,10 +4,12 @@ PySpark-based synthetic data generator for **1,000,000 rows** of industrial wash
 
 ## 📋 Overview
 
-This generator creates **TWO datasets**:
+This generator creates **FOUR datasets**:
 
-1. **Normal Dataset**: Clean sensor data without anomalies (baseline/unsupervised learning)
-2. **Anomaly Dataset**: Same data with 2% injected anomalies + `is_anomaly` label (supervised learning)
+1. **Normal Historical Dataset**: Clean sensor data without anomalies
+2. **Anomaly Historical Dataset**: Same data with 2% injected anomalies + `is_anomaly` label (supervised learning)
+3. **Normal Streaming Dataset**: Clean sensor data without anomalies
+4. **Anomaly Streaming Dataset**: Same data with 2% injected anomalies + `is_anomaly` label (supervised learning)
 
 ## 🔧 Features Generated
 
@@ -71,10 +73,10 @@ The generator injects 5 types of realistic anomalies:
 
 ```python
 # Requires PySpark
-pip install pyspark
+make create datasets
 ```
 
-### Basic Usage
+### Basic Usage (See example_usage.py)
 
 ```python
 from pyspark.sql import SparkSession
@@ -90,7 +92,8 @@ spark = SparkSession.builder \
 normal_df, anomaly_df = generate_industrial_washer_datasets(
     spark=spark,
     num_rows=1_000_000,
-    anomaly_rate=0.02  # 2% anomalies
+    anomaly_rate=0.02,  # 2% anomalies
+    streaming=False # True for streaming datasets
 )
 
 # Display samples
@@ -104,7 +107,7 @@ anomaly_df.filter("is_anomaly = 1").show(10)
 from industrial_washer_generator import save_datasets
 
 # Saves to Parquet + CSV samples
-save_datasets(normal_df, anomaly_df, output_path="/your/path")
+save_datasets(normal_df, anomaly_df, output_path="/your/path", streaming=False)
 ```
 
 ## 📊 Example Analysis

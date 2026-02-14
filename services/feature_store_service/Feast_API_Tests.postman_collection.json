@@ -1,0 +1,334 @@
+{
+  "info": {
+    "name": "Feast Feature Store - Washing Machine Anomaly Detection",
+    "description": "Complete API tests for Feast Feature Store. START with 'Push Features' to load data into Redis!",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health Check ✓",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status is healthy\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.status).to.eql(\"healthy\");",
+              "});",
+              "",
+              "pm.test(\"Response time < 200ms\", function () {",
+              "    pm.expect(pm.response.responseTime).to.be.below(200);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        },
+        "description": "Check if Feature Server is running and healthy"
+      }
+    },
+    {
+      "name": "2. Push Features - Initial Load 🔄",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Push successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "console.log(\"✓ Loaded 5 machines into Redis\");"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"push_source_name\": \"washing_stream_source\",\n  \"df\": {\n    \"Machine_ID\": [1, 2, 3, 4, 5],\n    \"timestamp\": [\"2024-02-14T10:00:00\", \"2024-02-14T10:00:00\", \"2024-02-14T10:00:00\", \"2024-02-14T10:00:00\", \"2024-02-14T10:00:00\"],\n    \"Cycle_Phase_ID\": [1, 2, 3, 1, 2],\n    \"Current_L1\": [12.5, 13.2, 11.8, 12.0, 13.5],\n    \"Current_L2\": [12.3, 13.1, 11.9, 12.1, 13.4],\n    \"Current_L3\": [12.4, 13.0, 12.0, 12.2, 13.3],\n    \"Voltage_L_L\": [230.5, 229.8, 231.2, 230.0, 229.5],\n    \"Water_Temp_C\": [45.0, 50.5, 42.0, 46.0, 48.0],\n    \"Motor_RPM\": [1200.0, 1150.0, 1300.0, 1250.0, 1180.0],\n    \"Water_Flow_L_min\": [15.5, 16.2, 14.8, 15.0, 16.0],\n    \"Vibration_mm_s\": [2.3, 2.1, 2.5, 2.2, 2.0],\n    \"Water_Pressure_Bar\": [3.2, 3.1, 3.3, 3.0, 3.2],\n    \"Vibration_RollingMax_10min\": [3.5, 3.2, 3.8, 3.4, 3.1]\n  },\n  \"to\": \"online\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/push",
+          "host": ["{{base_url}}"],
+          "path": ["push"]
+        },
+        "description": "⚠️ RUN THIS FIRST! Loads initial data for 5 machines into Redis online store."
+      }
+    },
+    {
+      "name": "3. Get Features - By Names 📊",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Features retrieved\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.metadata.feature_names).to.include(\"Current_L1\");",
+              "});",
+              "",
+              "pm.test(\"Got 3 machines\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.results.length).to.eql(3);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"features\": [\n    \"machine_stream_features:Current_L1\",\n    \"machine_stream_features:Vibration_mm_s\",\n    \"machine_stream_features:Motor_RPM\",\n    \"machine_stream_features:Water_Temp_C\"\n  ],\n  \"entities\": {\n    \"Machine_ID\": [1, 2, 3]\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/get-online-features",
+          "host": ["{{base_url}}"],
+          "path": ["get-online-features"]
+        },
+        "description": "Retrieve specific features for multiple machines by specifying feature names"
+      }
+    },
+    {
+      "name": "4. Get Features - Feature Service 🎯",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"All features retrieved\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.metadata.feature_names.length).to.be.above(10);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"feature_service\": \"machine_anomaly_service_v1\",\n  \"entities\": {\n    \"Machine_ID\": [1, 2]\n  },\n  \"full_feature_names\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/get-online-features",
+          "host": ["{{base_url}}"],
+          "path": ["get-online-features"]
+        },
+        "description": "Get ALL features defined in the anomaly detection feature service (11 features)"
+      }
+    },
+    {
+      "name": "5. Get Single Machine - All Features 🔍",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Single machine retrieved\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.results.length).to.eql(1);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"features\": [\n    \"machine_stream_features:Cycle_Phase_ID\",\n    \"machine_stream_features:Current_L1\",\n    \"machine_stream_features:Current_L2\",\n    \"machine_stream_features:Current_L3\",\n    \"machine_stream_features:Voltage_L_L\",\n    \"machine_stream_features:Water_Temp_C\",\n    \"machine_stream_features:Motor_RPM\",\n    \"machine_stream_features:Water_Flow_L_min\",\n    \"machine_stream_features:Vibration_mm_s\",\n    \"machine_stream_features:Water_Pressure_Bar\",\n    \"machine_stream_features:Vibration_RollingMax_10min\"\n  ],\n  \"entities\": {\n    \"Machine_ID\": [1]\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/get-online-features",
+          "host": ["{{base_url}}"],
+          "path": ["get-online-features"]
+        },
+        "description": "Get all sensor features for a single machine (Machine ID = 1)"
+      }
+    },
+    {
+      "name": "6. Push New Data - Anomaly 🚨",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Anomaly data pushed\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "console.log(\"✓ Pushed anomaly data for Machine 1\");",
+              "console.log(\"  - High vibration: 5.8 mm/s (normal ~2.3)\");",
+              "console.log(\"  - High current: 18.5 A (normal ~12.5)\");",
+              "console.log(\"➜ Run request #5 again to see updated values!\");"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"push_source_name\": \"washing_stream_source\",\n  \"df\": {\n    \"Machine_ID\": [1],\n    \"timestamp\": [\"2024-02-14T11:00:00\"],\n    \"Cycle_Phase_ID\": [3],\n    \"Current_L1\": [18.5],\n    \"Current_L2\": [18.3],\n    \"Current_L3\": [18.4],\n    \"Voltage_L_L\": [235.5],\n    \"Water_Temp_C\": [65.0],\n    \"Motor_RPM\": [1450.0],\n    \"Water_Flow_L_min\": [20.5],\n    \"Vibration_mm_s\": [5.8],\n    \"Water_Pressure_Bar\": [4.5],\n    \"Vibration_RollingMax_10min\": [6.2]\n  },\n  \"to\": \"online\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/push",
+          "host": ["{{base_url}}"],
+          "path": ["push"]
+        },
+        "description": "Simulate anomalous readings for Machine 1 (high vibration & current). After running this, run request #5 to see updated values!"
+      }
+    },
+    {
+      "name": "7. Push Multiple Machines Update 📡",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Batch update successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "console.log(\"✓ Updated 3 machines\");"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"push_source_name\": \"washing_stream_source\",\n  \"df\": {\n    \"Machine_ID\": [1, 2, 3],\n    \"timestamp\": [\"2024-02-14T12:00:00\", \"2024-02-14T12:00:00\", \"2024-02-14T12:00:00\"],\n    \"Cycle_Phase_ID\": [1, 2, 1],\n    \"Current_L1\": [11.8, 12.9, 12.2],\n    \"Current_L2\": [11.7, 12.8, 12.1],\n    \"Current_L3\": [11.9, 12.7, 12.3],\n    \"Voltage_L_L\": [230.0, 229.5, 231.0],\n    \"Water_Temp_C\": [43.0, 48.5, 44.0],\n    \"Motor_RPM\": [1180.0, 1200.0, 1220.0],\n    \"Water_Flow_L_min\": [14.8, 15.5, 15.2],\n    \"Vibration_mm_s\": [2.1, 2.0, 2.2],\n    \"Water_Pressure_Bar\": [3.0, 3.1, 3.0],\n    \"Vibration_RollingMax_10min\": [3.2, 3.1, 3.3]\n  },\n  \"to\": \"online\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/push",
+          "host": ["{{base_url}}"],
+          "path": ["push"]
+        },
+        "description": "Update multiple machines at once (simulating batch telemetry)"
+      }
+    },
+    {
+      "name": "8. Get Features - All 5 Machines 📋",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"features\": [\n    \"machine_stream_features:Current_L1\",\n    \"machine_stream_features:Vibration_mm_s\",\n    \"machine_stream_features:Motor_RPM\"\n  ],\n  \"entities\": {\n    \"Machine_ID\": [1, 2, 3, 4, 5]\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/get-online-features",
+          "host": ["{{base_url}}"],
+          "path": ["get-online-features"]
+        },
+        "description": "Get key features for all 5 machines at once"
+      }
+    }
+  ]
+}
