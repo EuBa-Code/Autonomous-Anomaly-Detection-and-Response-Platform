@@ -29,18 +29,6 @@ Validation (verify calculations)
 Output Data (Parquet, flat structure)
 ```
 
-## Requirements
-
-- Python 3.7+
-- Apache Spark 3.x
-- PySpark
-- PyYAML
-
-### Installation
-
-```bash
-pip install pyspark pyyaml
-```
 
 ## Configuration
 
@@ -119,19 +107,6 @@ spark_config:
 
 ## Usage
 
-### Process All Datasets
-
-```bash
-python hist_ingestion.py --config config/feature_engineering_config.yaml
-```
-
-### Process a Specific Dataset
-
-```bash
-python hist_ingestion.py \
-  --config config/feature_engineering_config.yaml \
-  --dataset industrial_washer_normal
-```
 
 ### Programmatic Usage
 
@@ -325,23 +300,7 @@ Aggregate historical sensor data for trend analysis and reporting.
 ### Issue: Unsorted Output
 **Solution**: Ensure `verify_timestamp_order` is enabled and check final sort operations
 
-## License
+---
 
-[Your License Here]
-
-## Contributing
-
-[Contributing Guidelines Here]
-
-## Contact
-
-[Contact Information Here]
-
-## Changelog
-
-### Version 1.0.0
-- Initial release with rolling max aggregation
-- Support for time-based windows
-- Data quality validation
-- Per-machine partitioning
-- Flat output structure
+**Generated for Machine Learning Engineers**  
+Part of the Industrial Washing Machine Anomaly Detection System

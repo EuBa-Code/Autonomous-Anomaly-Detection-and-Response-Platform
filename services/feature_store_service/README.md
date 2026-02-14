@@ -98,10 +98,10 @@ make run_feature_store
 ### 2. TEST with POSTMAN (First Time Only)
 
 ```bash
-import in postman
+IMPORT FILE WITH POSTMAAN 
 ```
 
-[FILE](\Feast_API_Tests.postman_collection.json)
+------> [FILE](\Feast_API_Tests.postman_collection.json)
 
 
 **🎉 You're ready to go!**
