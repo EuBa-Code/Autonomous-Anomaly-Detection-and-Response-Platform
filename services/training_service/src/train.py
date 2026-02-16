@@ -21,7 +21,6 @@ from model import IsolationForestModel
 from metrics import MetricsCalculator
 from validation import ConfigValidator
 
-from config import Config
 
 # ============================================================================
 # LOGGING CONFIGURATION

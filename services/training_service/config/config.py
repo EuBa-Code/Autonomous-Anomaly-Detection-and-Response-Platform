@@ -2,6 +2,7 @@
 Configuration module for Training Service.
 Centralizes all paths and parameters.
 """
+import os
 from pathlib import Path
 
 
@@ -16,10 +17,12 @@ class TrainingConfig:
     # ============================================================================
     
     # Root directories
-    ROOT_DIR = Path("/training")  # Container root
-    DATA_DIR = ROOT_DIR / "data"
-    MODELS_DIR = ROOT_DIR / "models"
-    METRICS_DIR = ROOT_DIR / "metrics"
+    APP_ROOT = os.getenv('APP_ROOT', '/training')
+    ROOT_DIR = Path(APP_ROOT)  # Container root
+    
+    DATA_DIR = Path(os.getenv('DATA_DIR', str(ROOT_DIR / "data")))
+    MODELS_DIR = Path(os.getenv('MODELS_DIR', str(ROOT_DIR / "models")))
+    METRICS_DIR = Path(os.getenv('METRICS_DIR', str(ROOT_DIR / "metrics")))
     
     # Data subdirectories
     RAW_DATA_DIR = DATA_DIR / "raw"
