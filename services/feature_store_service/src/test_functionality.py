@@ -82,7 +82,7 @@ if __name__ == '__main__':
         now = datetime.now()
         streaming_data = pd.DataFrame({
             "Machine_ID": [1, 2, 3],
-            "event_timestamp": [now, now, now],  
+            "timestamp": [now, now, now],  
             "Cycle_Phase_ID": [2, 3, 1],
             "Current_L1": [12.5, 13.2, 11.8],
             "Current_L2": [12.3, 13.1, 11.9],
@@ -140,7 +140,7 @@ if __name__ == '__main__':
         # Create entity dataframe with timestamps
         entity_df = pd.DataFrame({
             "Machine_ID": [1, 2, 3],
-            "event_timestamp": [
+            "timestamp": [
                 datetime.now() - timedelta(hours=1),
                 datetime.now() - timedelta(hours=2),
                 datetime.now() - timedelta(hours=3)
