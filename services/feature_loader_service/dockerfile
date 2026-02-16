@@ -1,0 +1,25 @@
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_SYSTEM_PYTHON=1
+
+WORKDIR /feature_loader_service
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml uv.lock ./
+
+# Use feature_store_apply group as it contains feast[redis]
+RUN uv sync --frozen --no-dev --group feature_store_apply
+
+COPY services/feature_loader_service/src ./src/
+# Copy feast config too
+COPY services/feature_store_service/config/feature_store.yaml ./feature_store.yaml
+
+ENV PYTHONPATH="/feature_loader_service"
+ENV FEAST_REPO_PATH="/feature_loader_service"
+
+CMD ["python", "src/loader.py"]

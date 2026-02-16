@@ -6,14 +6,15 @@ COPY pyproject.toml uv.lock ./
 
 RUN uv sync --frozen --no-dev --group training_ml
 
-COPY src/ ./src/
+COPY services/training_service/src/ ./src/
+COPY services/training_service/config/ ./config/
 
 RUN mkdir -p /training/data/raw \
-             /training/data/processed \
-             /training/models \
-             /training/metrics \
-             /training/logs
+    /training/data/processed \
+    /training/models \
+    /training/metrics \
+    /training/logs
 
-ENV PYTHONPATH=/training
+ENV PYTHONPATH="/training:/training/src"
 
-CMD ["uv", "run", "python", "src/train.py"]
+CMD ["python", "src/train.py"]

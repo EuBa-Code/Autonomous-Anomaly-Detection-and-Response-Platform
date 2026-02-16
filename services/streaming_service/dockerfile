@@ -1,0 +1,32 @@
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_SYSTEM_PYTHON=1
+
+WORKDIR /streaming_service
+
+# Install build-essential if needed for some dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install specific group
+RUN uv sync --frozen --no-dev --group streaming
+
+# Copy source code and config
+COPY services/streaming_service/src ./src/
+COPY config ./config/
+# Copy feast config too
+COPY services/feature_store_service/config/feature_store.yaml ./feature_store.yaml
+
+# Protocol requires config/ folder inside the service if needed
+# For now we use the global config as requested in some READMEs
+# But we ensure it's in the python path
+ENV PYTHONPATH="/streaming_service"
+
+CMD ["python", "src/app.py"]
