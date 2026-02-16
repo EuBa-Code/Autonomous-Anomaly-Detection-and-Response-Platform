@@ -12,7 +12,15 @@ create_datasets:
 
 run_all:
 	uv sync
-	docker compose up --build create_datasets hist_ingestion
+	docker compose up --build create_datasets hist_ingestion feature_store_apply
+
+streaming:
+	uv sync
+	docker compose up --build streaming_service
+
+load_features:
+	uv sync
+	docker compose up --build feature_loader
 
 # NEW: Complete reset and rebuild of the environment
 reboot:
