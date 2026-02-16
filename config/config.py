@@ -13,7 +13,7 @@ class Config:
     
     # --- 2. Kafka Settings ---
     # Matches the 'KAFKA_ADVERTISED_LISTENERS' in your compose.yaml
-    KAFKA_SERVER = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'redpanda:19092')
+    KAFKA_SERVER = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'redpanda:9092')
     TOPIC_TELEMETRY = os.getenv('TOPIC_TELEMETRY', 'telemetry-data')
     CONSUMER_GROUP = os.getenv('KAFKA_CONSUMER_GROUP', 'anomaly-detector-v1')
 
@@ -47,7 +47,7 @@ class IsolationForestConfig:
     """Specific settings for the Anomaly Detection Model"""
 
     BASE_DIR = Config.DATA_DIR
-    DATA_DIR = BASE_DIR / "data/historical_data"
+    DATA_DIR = BASE_DIR / "historical_data"
     MODEL_DIR = BASE_DIR / "models"
     METRICS_DIR = BASE_DIR / "metrics"
     
@@ -70,9 +70,6 @@ class IsolationForestConfig:
     MODEL_FILENAME = 'isolation_forest_model.pkl'
     METRICS_FILENAME = "training_metrics.json"
     SCALER_FILENAME = "scaler.pkl"
-
-    MODEL_DIR = Config.DATA_DIR / 'models'
-    METRICS_DIR = Config.DATA_DIR / 'metrics'
 
     # Full output paths
     MODEL_PATH = MODEL_DIR / MODEL_FILENAME
