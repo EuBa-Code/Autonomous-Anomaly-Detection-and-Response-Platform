@@ -86,7 +86,7 @@ services:
       # Shared registry (must persist and be writable)
       - ./data/registry:/feature_store_service/data/registry
       # Offline store data (read-only)
-      - ./data/synthetic_datasets/industrial_washer_normal:/feature_store_service/data/offline:ro
+      - ./data/processed_datasets/industrial_washer_normal_features:/feature_store_service/data/offline:ro
     networks:
       - anomaly-detection-network
     restart: 'no'  # Run once only
@@ -112,7 +112,7 @@ services:
       # Read-only access to registry
       - ./data/registry:/feature_store_service/data/registry:ro
       # Read-only access to offline data
-      - ./data/synthetic_datasets/industrial_washer_normal:/feature_store_service/data/offline:ro
+      - ./data/processed_datasets/industrial_washer_normal_features:/feature_store_service/data/offline:ro
     ports:
       - '8001:6566'  # Feast feature server default port is 6566
     networks:

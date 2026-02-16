@@ -82,7 +82,7 @@ if __name__ == '__main__':
         now = datetime.now()
         streaming_data = pd.DataFrame({
             "Machine_ID": [1, 2, 3],
-            "timestamp": [now, now, now],  
+            "event_timestamp": [now, now, now],  # FIXED: Changed from "timestamp" to "event_timestamp"
             "Cycle_Phase_ID": [2, 3, 1],
             "Current_L1": [12.5, 13.2, 11.8],
             "Current_L2": [12.3, 13.1, 11.9],
@@ -140,7 +140,7 @@ if __name__ == '__main__':
         # Create entity dataframe with timestamps
         entity_df = pd.DataFrame({
             "Machine_ID": [1, 2, 3],
-            "timestamp": [
+            "event_timestamp": [
                 datetime.now() - timedelta(hours=1),
                 datetime.now() - timedelta(hours=2),
                 datetime.now() - timedelta(hours=3)
@@ -174,6 +174,7 @@ if __name__ == '__main__':
         print("✓ Registered Feature Views:")
         for fv in feature_views:
             print(f"  - {fv.name}")
+            # FIXED: Handle both Entity objects and string names
             entity_names = [e.name if hasattr(e, 'name') else str(e) for e in fv.entities]
             print(f"    Entities: {entity_names}")
             print(f"    TTL: {fv.ttl}")
