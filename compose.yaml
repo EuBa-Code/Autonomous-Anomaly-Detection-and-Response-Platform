@@ -49,7 +49,6 @@ services:
     networks:
       - anomaly-detection-network
 
- 
   redis:
     build:
       context: ./services/redis_service
@@ -69,7 +68,7 @@ services:
   feature_store_apply:
     build:
       context: .
-      dockerfile: services/feature_store_src/feature_store/Dockerfile
+      dockerfile: services/feature_store_service/Dockerfile
     container_name: feature_store_apply
     depends_on:
       redis:
@@ -95,16 +94,17 @@ services:
         condition: service_healthy
       feature_store_apply:
         condition: service_completed_successfully
+    command: [ "uv", "run", "feast", "serve", "-h", "0.0.0.0", "-p", "8000" ]
     environment:
       - PYTHONUNBUFFERED=1
-      - FEAST_REPO_PATH=/app
+      - FEAST_REPO_PATH=/feature_store_service
     volumes:
       # Read-only access to registry
       - ./data/registry:/app/data/registry:ro
       # Read-only access to offline data
       - ./data/offline:/app/data/offline:ro
     ports:
-      - '8001:8000' # Changed from 8080 to avoid conflict with redpanda-console
+      - '8001:8000'
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -117,10 +117,10 @@ services:
   create_datasets:
     build:
       context: .
-      dockerfile: services/Dockerfile.spark_services 
+      dockerfile: services/Dockerfile.spark_services
     container_name: create_datasets
     # Override the command to run the specific module for this service
-    command: ["-m", "services.create_datasets_service.src.example_usage"]
+    command: [ "-m", "services.create_datasets_service.src.example_usage" ]
     environment:
       - APP_HOME=/app
       - PYTHONUNBUFFERED=1
@@ -136,7 +136,7 @@ services:
     restart: "no"
 
   hist_ingestion:
-    build: 
+    build:
       context: .
       dockerfile: services/Dockerfile.spark_services # Same Dockerfile of create_datasets!!
     container_name: historical_ingestion_service
@@ -144,7 +144,7 @@ services:
       create_datasets:
         condition: service_completed_successfully
     # Different command for this service
-    command: ["-m", "services.historical_ingestion_service.src.hist_ingestion"]
+    command: [ "-m", "services.historical_ingestion_service.src.hist_ingestion" ]
     environment:
       - APP_HOME=/app
       - PYTHONUNBUFFERED=1
@@ -156,13 +156,13 @@ services:
       - "4041:4040"
     networks:
       - anomaly-detection-network
-    shm_size: '2gb' 
+    shm_size: '2gb'
     restart: "no"
 
   feature_loader:
     build:
       context: .
-      dockerfile: services/feature_loader_service/Dockerfile
+      dockerfile: services/feature_loader_service/dockerfile
     container_name: feature_loader
     depends_on:
       redis:
@@ -173,12 +173,32 @@ services:
       - PYTHONUNBUFFERED=1
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - FEAST_REPO_PATH=/feature_loader_service
     volumes:
-      - ./data/processed_datasets:/app/data/processed_datasets:ro
-      - ./data/synthetic_datasets:/app/data/synthetic_datasets:ro
+      - ./data:/app/data:ro
+      - ./data/registry:/app/data/registry
     networks:
       - anomaly-detection-network
     restart: 'no'
+
+  streaming_service:
+    build:
+      context: .
+      dockerfile: services/streaming_service/dockerfile
+    container_name: streaming_service
+    depends_on:
+      redpanda:
+        condition: service_started
+    environment:
+      - PYTHONUNBUFFERED=1
+      - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
+      - FEAST_REPO_PATH=/streaming_service
+    volumes:
+      - ./data/models:/streaming_service/data/models:ro
+      - ./data/registry:/app/data/registry
+    networks:
+      - anomaly-detection-network
+    restart: unless-stopped
 
 networks:
   anomaly-detection-network:
