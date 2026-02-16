@@ -5,7 +5,7 @@ import numpy as np
 import os
 import mlflow
 from config.settings import Settings
-from src.load_from_feast_split import DataManager
+from services.training_service.src.load_from_feast import DataManager
 from src.model import ModelFactory
 from src.evaluator import ProductionMetricsCalculator
 from src.utils import create_and_log_signature
@@ -17,6 +17,11 @@ def get_training_number(output_dir: str) -> int:
     """
     Determina il numero del training corrente.
     Incrementale basato sui file di metriche salvati.
+
+    Args:
+        output_dir: Directory dove sono salvati i file di metriche (es. "metrics_training_1.json")
+    Returns:
+        training_number: Numero intero del training (1, 2, 3, ...)
     """
     metrics_history_file = os.path.join(output_dir, "training_history.json")
     
@@ -24,18 +29,24 @@ def get_training_number(output_dir: str) -> int:
         return 1
     
     try:
-        with open(metrics_history_file, "r") as f:
-            history = json.load(f)
-            return len(history) + 1
-    except:
+        with open(metrics_history_file, "r") as f: # Legge la storia dei training passati per determinare il numero del training corrente
+            history = json.load(f)                 # Se il file esiste, carica la storia e restituisce il numero del prossimo training (lunghezza della storia + 1)
+            return len(history) + 1                # Se il file esiste, restituisce il numero del prossimo training (lunghezza della storia + 1)
+    except:                                        # Se c'è un errore nella lettura del file (es. file corrotto) → inizia da 1
         return 1
 
 def save_training_metrics(output_dir: str, training_number: int, metrics: dict, thresholds: dict, drift_report: dict):
     """
     Salva metriche di questo training nella storia.
     Usate per confronto drift al prossimo training.
+    Args:
+        output_dir: Directory dove salvare i file di metriche
+        training_number: Numero del training corrente (1, 2, 3, ...)
+        metrics: Dizionario con metriche calcolate per questo training
+        thresholds: Dizionario con soglie calcolate per questo training
+        drift_report: Dizionario con report di drift detection per questo training
     """
-    metrics_history_file = os.path.join(output_dir, "training_history.json")
+    metrics_history_file = os.path.join(output_dir, "training_history.json") # File cumulativo con la storia di tutti i training (training_history.json)
     metrics_by_training_file = os.path.join(output_dir, f"metrics_training_{training_number}.json")
     
     # Salva metriche per questo specifico training
@@ -49,12 +60,14 @@ def save_training_metrics(output_dir: str, training_number: int, metrics: dict, 
     
     os.makedirs(output_dir, exist_ok=True)
     
-    with open(metrics_by_training_file, "w") as f:
-        json.dump(training_data, f, indent=2)
+    with open(metrics_by_training_file, "w") as f: # Salva le metriche di questo training in un file specifico (metrics_training_{training_number}.json)
+        json.dump(training_data, f, indent=2)      
     logger.info(f"[SAVE] Metriche training salvate: {metrics_by_training_file}")
     
     # Mantieni storia cumulativa
-    history = []
+    # Lista di tutti i training passati con le loro metriche. Se il file esiste, 
+    # carica la storia e aggiungi il nuovo training alla lista. Se il file non esiste o è corrotto, inizia una nuova lista.
+    history = []    
     if os.path.exists(metrics_history_file):
         try:
             with open(metrics_history_file, "r") as f:
@@ -70,14 +83,14 @@ def save_training_metrics(output_dir: str, training_number: int, metrics: dict, 
 
 def main():
     s = Settings()
-    mlflow.set_tracking_uri(s.mlflow_tracking_uri)
-    mlflow.set_experiment(s.mlflow_experiment_name)
+    mlflow.set_tracking_uri(s.mlflow_tracking_uri) # Configura MLflow per connettersi al tracking server specificato (locale o remoto)
+    mlflow.set_experiment(s.mlflow_experiment_name) # Se l'esperimento non esiste, MLflow lo crea automaticamente. Usato per organizzare i training in un unico esperimento
 
     # Determina numero training
-    training_number = get_training_number(s.output_dir)
+    training_number = get_training_number(s.output_dir) ## Leggi training_history.json (incrementale) per assegnare numero training if not exists → training_number = 1
     logger.info(f"[MAIN] Avvio Training #{training_number}")
     print("\n" + "="*70)
-    print(f"🚀 TRAINING #{training_number}")
+    print(f" TRAINING #{training_number}")
     print("="*70 + "\n")
 
     # 1. DATA
@@ -135,14 +148,14 @@ def main():
         logger.info(f"[EVAL] Anomalie rilevate: {metrics['n_anomalies_detected']} ({metrics['anomaly_percentage']:.2f}%)")
         logger.info(f"[EVAL] Score distribution p50: {metrics['score_distribution']['p50']:.4f}")
 
-        # 6. DRIFT DETECTION (dal 2° training in poi)
+        # 6. DRIFT DETECTION (dal 2° training in poi) [DA INSERIRE NEL BATCH JOB DI TRAINING LUNEDI MATTINA ALLE 7.00]
         logger.info(f"[DRIFT] Inizio drift detection (training #{training_number})...")
         previous_metrics_path = os.path.join(s.output_dir, f"metrics_training_{training_number - 1}.json")
         drift_report = evaluator.detect_drift(metrics, previous_metrics_path, training_number)
 
         # 7. LOGGING - Metriche complete su MLflow
         logger.info("[MLFLOW] Log metriche...")
-        mlflow.log_metrics({
+        mlflow.log_metrics({    
             "n_anomalies_detected": metrics["n_anomalies_detected"],
             "anomaly_rate": metrics["anomaly_percentage"],
             "latency_ms": metrics["inference_latency_ms"],
@@ -186,12 +199,12 @@ def main():
         mlflow.log_artifact(f"{s.output_dir}/thresholds.json")
         
         # Salva metriche nella storia
-        save_training_metrics(s.output_dir, training_number, metrics, thresholds, drift_report)
+        save_training_metrics(s.output_dir, training_number, metrics, thresholds, drift_report) 
 
     # 9. SEVERITY CLASSIFICATION - Esempio su anomalie
     logger.info("[SEVERITY] Analisi severità anomalie...")
     print("\n" + "="*70)
-    print("📋 SAMPLE SEVERITY ANALYSIS (prime 5 anomalie)")
+    print(" SAMPLE SEVERITY ANALYSIS (prime 5 anomalie)")
     print("="*70)
     
     anomaly_indices = np.where(pred_train == -1)[0][:5]
@@ -202,8 +215,8 @@ def main():
     
     print("="*70 + "\n")
 
-    logger.info(f"✅ Training #{training_number} completato con successo!")
-    print(f"\n✅ TRAINING #{training_number} COMPLETATO CON SUCCESSO!\n")
+    logger.info(f" Training #{training_number} completato con successo!")
+    print(f"\n TRAINING #{training_number} COMPLETATO CON SUCCESSO!\n")
 
 if __name__ == "__main__":
     main()
