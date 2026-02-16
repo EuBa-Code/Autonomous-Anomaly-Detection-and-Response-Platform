@@ -16,6 +16,7 @@ from feast.infra.offline_stores.file_source import FileSource
 machines_batch = FileSource(
     name="washing_batch_source",
     path="/feature_store_service/data/offline/", 
+    timestamp_field='timestamp',
     description="Historical washing machine features stored in partitioned Parquet files"
 )
 
