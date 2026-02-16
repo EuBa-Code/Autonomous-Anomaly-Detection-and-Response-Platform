@@ -28,10 +28,10 @@ if __name__ == '__main__':
     try:
         features = store.get_online_features(
             features=[
-                "machine_stream_features:Current_L1",
-                "machine_stream_features:Vibration_mm_s",
-                "machine_stream_features:Motor_RPM",
-                "machine_batch_features:Water_Temp_C"
+                "machine_features:Current_L1",
+                "machine_features:Vibration_mm_s",
+                "machine_features:Motor_RPM",
+                "machine_features:Water_Temp_C"
             ],
             entity_rows=[
                 {"Machine_ID": 1},  
@@ -54,8 +54,11 @@ if __name__ == '__main__':
     print("\n[TEST 2] Getting online features using feature service...")
 
     try:
+        # FIXED: Get the feature service object first, then pass it to get_online_features
+        feature_service = store.get_feature_service("machine_anomaly_service_v1")
+        
         features = store.get_online_features(
-            feature_service="machine_anomaly_service_v1",
+            features=feature_service,  # Pass the feature service object, not a string
             entity_rows=[
                 {"Machine_ID": 1},
                 {"Machine_ID": 2}
@@ -79,7 +82,7 @@ if __name__ == '__main__':
         now = datetime.now()
         streaming_data = pd.DataFrame({
             "Machine_ID": [1, 2, 3],
-            "timestamp": [now, now, now],
+            "event_timestamp": [now, now, now],  
             "Cycle_Phase_ID": [2, 3, 1],
             "Current_L1": [12.5, 13.2, 11.8],
             "Current_L2": [12.3, 13.1, 11.9],
@@ -93,8 +96,9 @@ if __name__ == '__main__':
             "Vibration_RollingMax_10min": [3.5, 3.2, 3.8]
         })
         
+        # FIXED: Changed push_source_name from "machine_features" to "washing_stream_source"
         store.push(
-            push_source_name="washing_stream_source",
+            push_source_name="washing_stream_source",  # This matches the PushSource name in data_sources.py
             df=streaming_data,
             to="online"  # Options: "online", "offline", "online_and_offline"
         )
@@ -118,7 +122,7 @@ if __name__ == '__main__':
         store.materialize(
             start_date=start_date,
             end_date=end_date,
-            feature_views=["machine_batch_features"]
+            feature_views=["machine_features"]
         )
         
         print("✓ Successfully materialized batch features")
@@ -146,9 +150,9 @@ if __name__ == '__main__':
         training_df = store.get_historical_features(
             entity_df=entity_df,
             features=[
-                "machine_batch_features:Current_L1",
-                "machine_batch_features:Vibration_mm_s",
-                "machine_batch_features:Motor_RPM"
+                "machine_features:Current_L1",
+                "machine_features:Vibration_mm_s",
+                "machine_features:Motor_RPM"
             ]
         ).to_df()
         
@@ -170,7 +174,8 @@ if __name__ == '__main__':
         print("✓ Registered Feature Views:")
         for fv in feature_views:
             print(f"  - {fv.name}")
-            print(f"    Entities: {[e.name for e in fv.entities]}")
+            entity_names = [e.name if hasattr(e, 'name') else str(e) for e in fv.entities]
+            print(f"    Entities: {entity_names}")
             print(f"    TTL: {fv.ttl}")
             print(f"    Features: {len(fv.schema)} fields")
             print()

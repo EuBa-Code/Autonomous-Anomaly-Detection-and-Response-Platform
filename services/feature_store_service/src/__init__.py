@@ -13,7 +13,7 @@ from src.entity import machine
 from src.data_sources import machines_batch, stream_source
 
 # Import feature views
-from src.features import machine_stream_features, machines_batch_features
+from src.features import machine_features
 
 # Import feature services
 from src.feature_services import machine_feature_service_v1
