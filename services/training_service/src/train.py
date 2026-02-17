@@ -26,7 +26,7 @@ import os
 import mlflow
 from mlflow import sklearn as mlflow_sklearn
 from config.settings import Settings
-from services.training_service.src.load_from_feast import DataManager
+from src.load_from_feast import DataManager
 from src.model import ModelFactory
 from src.evaluator import ProductionMetricsCalculator
 from src.utils import create_and_log_signature

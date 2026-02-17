@@ -14,6 +14,7 @@
 
 import os
 from pydantic_settings import BaseSettings
+from pydantic import BaseModel
 
 class Settings(BaseSettings):
     mlflow_tracking_uri: str = "http://mlflow:5000"     # MLflow host/port. Local for dev, remote for prod
@@ -26,7 +27,7 @@ class Settings(BaseSettings):
     output_dir: str = "outputs"                            # Directory to save JSON artifacts (history, thresholds)
     
 
-    class TrainingConfig:
+    class TrainingConfig(BaseModel):
         contamination: float = 0.02                         # Expected percentage of anomalies. If real dataset has <10% anomalies → IF might produce FalsePositive. If >10% → IF might miss TruePositive
         if_n_estimators: int = 100                         # Number of trees in Isolation Forest. Higher = potentially more accurate but slower
         random_state: int = 42                             # Random seed for reproducibility

@@ -233,12 +233,13 @@ services:
     - anomaly-detection-network
   environment:
     - MLFLOW_TRACKING_URI=http://mlflow:5000
-    - MLFLOW_EXPERIMENT_NAME="isolation_forest_prod"
-    - MODEL_NAME="if_anomaly_detector" 
+    - MLFLOW_EXPERIMENT_NAME=isolation_forest_prod
+    - MODEL_NAME=if_anomaly_detector 
     - PYTHONPATH=/training_service
   volumes:
     - ./data:/training_service/data
     - ./models:/training_service/models
     - ./logs:/training_service/logs
+    - ./outputs:/training_service/outputs
   restart: on-failure
   profiles: ["training"]
