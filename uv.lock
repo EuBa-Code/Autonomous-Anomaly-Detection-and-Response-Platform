@@ -3309,6 +3309,9 @@ ingestion = [
     { name = "scikit-learn" },
     { name = "scipy" },
 ]
+mlflow = [
+    { name = "mlflow" },
+]
 training-ml = [
     { name = "numpy" },
     { name = "pyarrow" },
@@ -3347,6 +3350,7 @@ ingestion = [
     { name = "scikit-learn", specifier = ">=1.8.0" },
     { name = "scipy", specifier = ">=1.17.0" },
 ]
+mlflow = [{ name = "mlflow", specifier = ">=3.9.0" }]
 training-ml = [
     { name = "numpy", specifier = ">=2.4.1" },
     { name = "pyarrow", specifier = ">=19.0.1" },

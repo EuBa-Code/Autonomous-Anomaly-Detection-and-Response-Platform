@@ -210,13 +210,35 @@ services:
     shm_size: '2gb'
     restart: "no"
 
-networks:
-  anomaly-detection-network:
-    driver: bridge
-    name: anomaly-detection-network
-
-# Named volumes
-volumes:
-  redis_data:
-    driver: local
-
+  mlflow:
+    build:
+      context: .
+      dockerfile: services/mlflow/Dockerfile
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlruns
+    restart: unless-stopped
+    networks:
+      - anomaly-detection-network
+  training_pipeline:
+  build:
+    context: .
+    dockerfile: services/training_service/Dockerfile
+  container_name: training_pipeline
+  depends_on:
+    - mlflow
+  networks:
+    - anomaly-detection-network
+  environment:
+    - MLFLOW_TRACKING_URI=http://mlflow:5000
+    - MLFLOW_EXPERIMENT_NAME="isolation_forest_prod"
+    - MODEL_NAME="if_anomaly_detector" 
+    - PYTHONPATH=/training_service
+  volumes:
+    - ./data:/training_service/data
+    - ./models:/training_service/models
+    - ./logs:/training_service/logs
+  restart: on-failure
+  profiles: ["training"]

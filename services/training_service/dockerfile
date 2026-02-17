@@ -1,19 +1,21 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
-WORKDIR /training
+WORKDIR /training_service
 
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock* ./
 
-RUN uv sync --frozen --no-dev --group training_ml
+RUN uv sync --frozen --no-dev --group training-pipeline
 
-COPY src/ ./src/
+COPY services/training_service/src ./src/
+COPY services/training_service/config ./config/
+COPY services/feature_store_service/config ./services/feature_store_service/config/
 
-RUN mkdir -p /training/data/raw \
-             /training/data/processed \
-             /training/models \
-             /training/metrics \
-             /training/logs
+RUN mkdir -p ./data/raw \
+            ./data/processed \
+            ./models \
+            ./metrics \
+            ./logs
 
-ENV PYTHONPATH=/training
+ENV PYTHONPATH=/training_service
 
-CMD ["uv", "run", "python", "src/train.py"]
+CMD ["uv", "run", "-m", "src.train"]
