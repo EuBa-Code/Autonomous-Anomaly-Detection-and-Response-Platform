@@ -1,62 +1,51 @@
-# Python-generated files
+# Python & Virtual Env
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-
-# Env
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+venv/
 .env
 
-# Personal files
-ImportantThings.txt
+# 🛑 DATA & ARTIFACTS (Strict Exclusion)
+# Ignora interamente la cartella data/ dove vengono generati i dataset e i modelli
+data/
 
-# Parquet Files
-*.parquet
-
-# Folders
-historical_data/
-streaming_data/
-processed_datasets/
-synthetic_datasets/
-
-# Kafka
-kafka_storage/
-
-# RedPanda
+# Ignora i volumi persistenti dei container
 redpanda_storage/
+kafka_storage/
+redis_data/
 
-# Logs
-training.log
+# 🛡️ SAFETY NET (Estensioni File Generati & Spark debris)
+# Ignora questi file ovunque si trovino, per sicurezza
+*.parquet
+*.pkl
+*.joblib
+*.db
+*.sqlite
+*.log
+*.csv
 
-# testing
-test_predictions.csv
+# Spark / Hadoop temporary files
+part-*
+_SUCCESS
+.*.crc
+.part-*.crc
+._SUCCESS.crc
 
-# Documentation (Internal)
-PROJECT_ARCHITECTURE.md
-
-# Airflow
-airflow_db/
-airflow_logs/
-COMPREHENSIVE_PROJECT_DOCS.md
-
-
-# Apache Spark
-models/spark_preprocessor
-data/historical_processed
-
-# Containers
-.devcontainer/
-
-# Metadata PySpark
-data/feature_metadata.json
-data/pyspark_metadata
-
-# .vscode/
+# IDE / Editors
 .vscode/
-.vscode/settings.json
+.idea/
+*.swp
+.DS_Store
+
+# documentation / logs
+BUGFIX_LOG.md
+TODO.md
+
+# NOTA: MLOPS_FLOW_EXPLAINED.md e COMPREHENSIVE_PROJECT_DOCS.md
+# NON sono nel gitignore perché sono documentazione statica utile ai colleghi.
+# Non vengono rigenerati dal codice.
+COMPREHENSIVE_PROJECT_DOCS.md
 MLOPS_FLOW_EXPLAINED.md
