@@ -24,23 +24,24 @@ class TrainingConfig:
     MODELS_DIR = Path(os.getenv('MODELS_DIR', str(ROOT_DIR / "models")))
     METRICS_DIR = Path(os.getenv('METRICS_DIR', str(ROOT_DIR / "metrics")))
     
-    # Data subdirectories
+    # Data subdirectories (Spark partitioned output from hist_ingestion)
     RAW_DATA_DIR = DATA_DIR / "raw"
-    PROCESSED_DATA_DIR = DATA_DIR / "processed"
+    TRAIN_DATA_DIR = RAW_DATA_DIR / "industrial_washer_normal_features"
+    TEST_DATA_DIR = RAW_DATA_DIR / "industrial_washer_with_anomalies_features"
     
     # ============================================================================
     # FILE PATTERNS
     # ============================================================================
     
-    TRAIN_FILE_PATTERN = "train*.parquet"
-    TEST_FILE_PATTERN = "test*.parquet"
+    TRAIN_FILE_PATTERN = "*.parquet"
+    TEST_FILE_PATTERN = "*.parquet"
     
     # ============================================================================
     # ARTIFACT NAMES
     # ============================================================================
     
     MODEL_ARTIFACT = "isolation_forest_model.pkl"
-    PREPROCESSOR_ARTIFACT = "preprocessor.pkl"
+    PREPROCESSOR_ARTIFACT = "preprocessor.joblib"
     METRICS_ARTIFACT = "training_metrics.json"
     PREDICTIONS_FILE = "test_predictions.csv"
     
