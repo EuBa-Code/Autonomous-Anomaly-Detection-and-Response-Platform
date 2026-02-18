@@ -112,7 +112,7 @@ services:
       - ./data/offline:/data/offline
       - ./services/feature_store_service/src:/feature_store_service/src:ro
     ports:
-      - "6566:6566"
+      - "8000:6566" # Now i can see it through the browser
     networks:
       - anomaly-detection-network
     command: ["uv", "run", "feast", "serve", "--host", "0.0.0.0", "--port", "6566"]

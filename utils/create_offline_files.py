@@ -52,7 +52,6 @@ STREAM_SCHEMA = pa.schema([
     # ── Feast / entity columns ────────────────────────────────────────────────
     pa.field("Machine_ID",                      pa.int64()),
     pa.field("timestamp",                       pa.timestamp("us", tz="UTC")),
-    pa.field("created",                         pa.timestamp("us", tz="UTC")),
 
     # ── Raw sensor readings ───────────────────────────────────────────────────
     pa.field("Cycle_Phase_ID",                  pa.int64()),
