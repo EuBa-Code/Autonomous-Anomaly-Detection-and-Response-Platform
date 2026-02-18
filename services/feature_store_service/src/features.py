@@ -110,5 +110,5 @@ machine_batch_features = FeatureView(
         Field(name="Weekly_Current_StdDev", dtype=Float32),
     ],
     source=machines_batch_source,
-    online=True,
+    online=False,
 )

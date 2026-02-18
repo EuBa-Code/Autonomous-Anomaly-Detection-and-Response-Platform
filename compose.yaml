@@ -84,8 +84,8 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./data/registry:/feature_store_service/data/registry
-      - ./data/processed_datasets/industrial_washer_normal_features:/feature_store_service/data/offline/machines_batch_features
-      - ./data/streaming_data:/feature_store_service/data/offline/machines_stream_source
+      - ./data/offline:/feature_store_service/data/offline
+      - ./services/feature_store_service:/feature_store_service:ro
     networks:
       - anomaly-detection-network
     restart: 'no'  # Run once only
@@ -109,20 +109,14 @@ services:
       - FEAST_REPO_PATH=/feature_store_service
     volumes:
       - ./data/registry:/feature_store_service/data/registry
-      - ./data/processed_datasets/industrial_washer_normal_features:/feature_store_service/data/offline/machines_batch_features
-      - ./data/streaming_data:/feature_store_service/data/offline/machines_stream_source
+      - ./data/offline:/feature_store_service/data/offline
+      - ./services/feature_store_service:/feature_store_service:ro
     ports:
-      - '8001:6566'  # Feast feature server default port is 6566
+      - "6566:6566"
     networks:
       - anomaly-detection-network
+    command: ["uv", "run", "feast", "serve", "--host", "0.0.0.0", "--port", "6566"]
     restart: unless-stopped
-    # Override CMD to run feature server instead of apply
-    command: ["uv", "run", "feast", "serve", "-h", "0.0.0.0"]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6566/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
 
   # ============================================================================
   # DATA GENERATION & PROCESSING SERVICES
