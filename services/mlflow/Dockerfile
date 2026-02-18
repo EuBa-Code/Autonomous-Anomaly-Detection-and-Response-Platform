@@ -13,5 +13,12 @@ RUN mkdir -p /mlruns/artifacts
 
 EXPOSE 5000
 
+ENV MLFLOW_BACKEND_STORE_URI=file:///mlruns \
+    MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlruns/artifacts \
+    PYTHONUNBUFFERED=1
 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000 || exit 1
+
+CMD ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000"]
 

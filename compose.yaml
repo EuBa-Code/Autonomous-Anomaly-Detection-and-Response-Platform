@@ -3,7 +3,7 @@ services:
   # REDPANDA - Message Broker (Kafka-compatible)
   # ============================================================================
   redpanda:
-    image: docker.redpanda.com/redpandadata/redpanda:latest
+    image: docker.redpanda.com/redpandadata/redpanda:latest # non metto build perché voglio usare l'immagine ufficiale più recente(presa da from del dockerfile)
     container_name: redpanda_broker
     command:
       - redpanda
@@ -143,11 +143,11 @@ services:
     
 # Feast configuration to use Redis
   feature_store_apply:
-    build:
-      context: .
-      dockerfile: services/feature_store_src/feature_store/Dockerfile
-    container_name: feature_store_apply
-    depends_on:
+    build:                  
+      context: .            
+      dockerfile: services/feature_store_service/Dockerfile 
+    container_name: feature_store_apply  
+    depends_on:                         
       redis:
         condition: service_healthy
     environment:
@@ -237,15 +237,23 @@ services:
     restart: unless-stopped
     networks:
       - anomaly-detection-network
-    
-    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+
   training_pipeline:
     build:
       context: .
       dockerfile: services/training_service/Dockerfile
     container_name: training_pipeline
     depends_on:
-      - mlflow
+      mlflow:
+        condition: service_healthy
+      feature_store_apply:
+        condition: service_completed_successfully
     networks:
       - anomaly-detection-network
     environment:
@@ -253,18 +261,19 @@ services:
       - MLFLOW_EXPERIMENT_NAME=isolation_forest_prod
       - MODEL_NAME=if_anomaly_detector
       - PYTHONPATH=/training_service
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./data:/training_service/data
       - ./models:/training_service/models
       - ./logs:/training_service/logs
       - ./outputs:/training_service/outputs
-    restart: on-failure
-    profiles: ["training"]
-
-networks:
-  anomaly-detection-network:
-    driver: bridge
+      - ./services/feature_store_service/config:/training_service/services/feature_store_service/config:ro
+    restart: "no"
 
 volumes:
   redis_data:
   mlflow_data:
+
+networks:
+  anomaly-detection-network:
+    driver: bridge

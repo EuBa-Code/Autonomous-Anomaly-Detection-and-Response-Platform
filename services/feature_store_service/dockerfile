@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_SYSTEM_PYTHON=1
 
-WORKDIR /feature_store_service
+WORKDIR /feature_store_service/config
 
 # Install C++ build tools (build-essential) required for compiling certain Python libraries (e.g., Pandas, Feast).
 # Clean up apt cache afterwards to minimize image size.
@@ -22,11 +22,12 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --group feature_store_apply
 
 # Create necessary folders for the Feast Registry (metadata) and Offline Store (Parquet files).
-COPY services/feature_store_src/feature_store /app/feature_store_src/feature_store
+COPY services/feature_store_service/config /feature_store_service/config
+COPY services/feature_store_service/src /feature_store_service/src
 
 RUN mkdir -p /feature_store_service/data/registry /feature_store_service/data/offline
 
 # Feast commands must be run from here to correctly identify the repository configuration.
 WORKDIR /feature_store_service
 
-CMD ["uv", "run", "feast", "apply"]`
+CMD ["uv", "run","python", "m" "feast", "apply"]

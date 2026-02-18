@@ -36,7 +36,7 @@ mlflow-up:
 	@ping -n 11 127.0.0.1 > nul
 
 training-up:
-	docker-compose -f compose.yaml --profile training up training_pipeline
+	docker-compose -f compose.yaml up -d --no-build training_pipeline
 
 all-up: mlflow-up training-up
 	@echo "MLflow e Training Pipeline avviati"

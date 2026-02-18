@@ -8,7 +8,6 @@ RUN uv sync --frozen --no-dev --group training-pipeline
 
 COPY services/training_service/src ./src/
 COPY services/training_service/config ./config/
-COPY services/feature_store_service/config ./services/feature_store_service/config/
 
 RUN mkdir -p ./data/raw \
             ./data/processed \
@@ -16,6 +15,7 @@ RUN mkdir -p ./data/raw \
             ./metrics \
             ./logs
 
-ENV PYTHONPATH=/training_service
+ENV PYTHONPATH="/training:/training/src"
+ENV PATH="/training/.venv/bin:$PATH"
 
 CMD ["uv", "run", "-m", "src.train"]
