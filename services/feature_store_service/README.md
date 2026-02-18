@@ -1,219 +1,183 @@
-# Feast Feature Store Service
+# Feature Store — API Test Suite
 
-> Production-ready feature store for the Washing Machine Anomaly Detection System
-
-[![Feast](https://img.shields.io/badge/Feast-0.39+-blue.svg)](https://feast.dev)
-[![Redis](https://img.shields.io/badge/Redis-7.0-red.svg)](https://redis.io)
-[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://python.org)
-
-## 📋 Table of Contents
-
-- [Overview](#-overview)
-- [Architecture](#️-architecture)
-- [Data Flow](#data-flow)
-- [Quick Start](#-quick-start)
-- [Project Structure](#-project-structure)
-- [Feature Definitions](#-feature-definitions)
-- [Additional Resources](#-additional-resources)
-
-
-## 🎯 Overview
-
-The Feast Feature Store service provides a production-grade feature serving layer for real-time anomaly detection in industrial washing machines. It manages **15 features** across two feature views per machine, enabling:
-
-- **Real-time inference** with sub-100ms latency
-- **Point-in-time correct** historical features for training
-- **Feature versioning** and lineage tracking
-- **Consistent serving** between training and inference
-
-### Key Features
-
-- ✅ **13 streaming features** (raw sensors + rolling-window aggregations)
-- ✅ **2 batch features** (daily / weekly long-horizon aggregations)
-- ✅ **Online store** (Redis) for real-time serving
-- ✅ **Offline store** (Parquet) for training data
-- ✅ **HTTP API** for easy integration
-- ✅ **Python SDK** for advanced use cases
-- ✅ **Push & batch** ingestion support
+A complete test suite to verify every aspect of your Feature Store (`anomaly_detection` project).
+Tests are organized in logical order: from system health, to data ingestion, to feature retrieval.
 
 ---
 
-## 🏗️ Architecture
+## Architecture Overview
 
+| Service | Description | External Port |
+|---|---|---|
+| `feature_store_apply` | Runs `feast apply` once to register all feature definitions | — |
+| `feature_store_service` | Serves features over HTTP (`feast serve`) | **8000** → internal 6566 |
+| `redis` | Online store (key TTL configured in `feature_store.yaml`) | 6379 |
+| `redpanda` | Kafka-compatible message broker | 19092 |
 
-### Feature Store Architecture
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│                   FEAST FEATURE STORE                          │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Feature Server (HTTP API - Port 8001)                  │   │
-│  │  • GET  /health                                         │   │
-│  │  • POST /get-online-features                            │   │
-│  │  • POST /push                                           │   │
-│  │  • POST /materialize                                    │   │
-│  └────────────┬─────────────────────────┬──────────────────┘   │
-│               │                         │                      │
-│    ┌──────────▼──────────┐   ┌─────────▼──────────┐            │
-│    │  Online Store       │   │  Offline Store      │           │
-│    │  (Redis)            │   │  (Parquet Files)    │           │
-│    │                     │   │                     │           │
-│    │  • Sub-100ms reads  │   │  • Training data    │           │
-│    │  • Real-time serve  │   │  • Point-in-time    │           │
-│    │  • TTL: 12h (stream)│   │  • Historical data  │           │
-│    │  • TTL: 7d (batch)  │   │                     │           │
-│    └─────────────────────┘   └─────────────────────┘           │
-│                                                                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Registry (SQLite)                                      │   │
-│  │  • Entity: machine (Machine_ID: Int64)                  │   │
-│  │  • Feature Views: stream (12h TTL), batch (7d TTL)      │   │
-│  │  • Feature Service: machine_anomaly_service_v1          │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────────┘
-```
-
-### Data Flow
-
-```
-Training Flow:
-  Parquet Files → Offline Store → get_historical_features() → ML Model
-
-Inference Flow:
-  Redis → Online Store → get_online_features() → ML Model (Prediction)
-
-Streaming Flow:
-  Kafka/Sensors → push() → Online Store → Available for Inference
-```
+> **Base URL for all API calls:** `http://localhost:8000`
 
 ---
 
-## 🚀 Quick Start
+## Feature Views at a Glance
 
-
-```bash
-make run_feature_store
-```
-
-### 2. TEST with POSTMAN (First Time Only)
-
-```bash
-IMPORT FILE WITH POSTMAN
-```
-
-------> [FILE](\Feast_API_Tests.postman_collection.json)
-
-
-**🎉 You're ready to go!**
-
----
-
-## 📁 Project Structure
-
-```
-feature_store_service/
-├── config/
-│   └── feature_store.yaml          # Feast configuration
-├── src/
-│   ├── __init__.py                 # Package exports
-│   ├── data_sources.py             # Batch & streaming sources
-│   ├── entity.py                   # Machine entity definition
-│   ├── features.py                 # Feature view definitions
-│   ├── feature_services.py         # Feature service (ML contract)
-│   └── test_functionality.py       # Integration tests
-├── Dockerfile                      # Container definition
-└── README.md                       # This file
-
-# Generated at runtime:
-data/
-├── registry/
-    └── registry.db
-```
-
-
-
-## 🔧 Feature Definitions
-
-### Entity: Machine
+### `machine_streaming_features` — TTL: 12 hours
+Populated by the real-time pipeline (Quixstreams → `washing_stream_push` PushSource).
 
 | Field | Type | Description |
-|-------|------|-------------|
-| `Machine_ID` | Int64 | Unique identifier for each washing machine |
+|---|---|---|
+| `Cycle_Phase_ID` | Int64 | Current wash cycle phase |
+| `Current_L1/L2/L3` | Float32 | Phase currents |
+| `Voltage_L_L` | Float32 | Line-to-line voltage |
+| `Water_Temp_C` | Float32 | Water temperature |
+| `Motor_RPM` | Float32 | Motor speed |
+| `Water_Flow_L_min` | Float32 | Water flow rate |
+| `Vibration_mm_s` | Float32 | Vibration level |
+| `Water_Pressure_Bar` | Float32 | Water pressure |
+| `Current_Imbalance_Ratio` | Float32 | 3-phase imbalance scalar |
+| `Vibration_RollingMax_10min` | Float32 | 10-min rolling max of vibration |
+| `Current_Imbalance_RollingMean_5min` | Float32 | 5-min rolling mean of imbalance ratio |
+
+### `machine_batch_features` — TTL: 7 days
+Populated by the batch pipeline (PySpark → partitioned Parquet at `/data/offline/machines_batch_features`).
+
+| Field | Type | Description |
+|---|---|---|
+| `Daily_Vibration_PeakMean_Ratio` | Float32 | max/mean vibration per machine per day |
+| `Weekly_Current_StdDev` | Float32 | Stddev of L1 current per machine per week |
 
 ---
 
-### Feature Views
+## Test Suite
 
-#### machine_streaming_features (Real-time)
+### 1. Connection Test (Health Check)
 
-**TTL:** 12 hours  
-**Source:** `washing_stream_push` (PushSource → backed by `washing_batch_source` for history)  
-**Use:** Online inference, real-time anomaly detection
+Verifies that the Feast server is running and can communicate with the Registry (`/data/registry/registry.db`).
 
-| Feature | Type | Source | Description | Unit |
-|---------|------|--------|-------------|------|
-| `Cycle_Phase_ID` | Int64 | Raw sensor | Current wash cycle phase (1–4) | — |
-| `Current_L1` | Float32 | Raw sensor | Phase L1 current draw | Amps |
-| `Current_L2` | Float32 | Raw sensor | Phase L2 current draw | Amps |
-| `Current_L3` | Float32 | Raw sensor | Phase L3 current draw | Amps |
-| `Voltage_L_L` | Float32 | Raw sensor | Line-to-line voltage | Volts |
-| `Water_Temp_C` | Float32 | Raw sensor | Water temperature | °C |
-| `Motor_RPM` | Float32 | Raw sensor | Motor speed | RPM |
-| `Water_Flow_L_min` | Float32 | Raw sensor | Water flow rate | L/min |
-| `Vibration_mm_s` | Float32 | Raw sensor | Instantaneous vibration level | mm/s |
-| `Water_Pressure_Bar` | Float32 | Raw sensor | Water pressure | Bar |
-| `Current_Imbalance_Ratio` | Float32 | Streaming pipeline | `(max(L1,L2,L3) − min) / mean` — instantaneous 3-phase imbalance scalar | — |
-| `Vibration_RollingMax_10min` | Float32 | Streaming pipeline | 10-minute rolling maximum of `Vibration_mm_s` per machine | mm/s |
-| `Current_Imbalance_RollingMean_5min` | Float32 | Streaming pipeline | 5-minute rolling mean of `Current_Imbalance_Ratio` per machine | — |
+- **Method:** `GET`
+- **URL:** `http://localhost:8000/health`
+- **Expected result:** `200 OK`. If it fails, check that `feature_store_apply` completed successfully before `feature_store_service` started.
 
 ---
 
-#### machine_batch_features (Historical Aggregations)
+### 2. Streaming Ingestion Test (Push API)
 
-**TTL:** 7 days  
-**Source:** `washing_batch_source` (FileSource → partitioned Parquet written by PySpark)  
-**Use:** Training data, long-horizon deterioration signals
+Simulates sending real-time data as Quixstreams would. Tests whether the `washing_stream_push` PushSource accepts data and writes it to Redis.
 
-| Feature | Type | Aggregation window | Description | Unit |
-|---------|------|--------------------|-------------|------|
-| `Daily_Vibration_PeakMean_Ratio` | Float32 | Per machine, per calendar day | `max(Vibration_mm_s) / mean(Vibration_mm_s)` — high ratio signals repeated shock events and mechanical deterioration | — |
-| `Weekly_Current_StdDev` | Float32 | Per machine, per week | Standard deviation of `Current_L1` over the week — grows as motor insulation degrades or mechanical resistance increases | Amps |
+- **Method:** `POST`
+- **URL:** `http://localhost:8000/push`
+- **Body (JSON):**
 
----
+```json
+{
+  "push_source_name": "washing_stream_push",
+  "df": {
+    "Machine_ID": [1001],
+    "timestamp": ["2026-02-18T20:00:00Z"],
+    "Cycle_Phase_ID": [3],
+    "Current_L1": [12.5],
+    "Current_L2": [11.8],
+    "Current_L3": [12.1],
+    "Voltage_L_L": [400.0],
+    "Water_Temp_C": [60.0],
+    "Motor_RPM": [850.0],
+    "Water_Flow_L_min": [18.5],
+    "Vibration_mm_s": [2.1],
+    "Water_Pressure_Bar": [3.4],
+    "Current_Imbalance_Ratio": [0.03],
+    "Vibration_RollingMax_10min": [2.8],
+    "Current_Imbalance_RollingMean_5min": [0.025]
+  },
+  "to": "online"
+}
+```
 
-### Feature Service
-
-#### machine_anomaly_service_v1
-
-Combines both feature views into a single versioned contract for the anomaly detection model. A single entity-row lookup on `Machine_ID` returns the full 15-feature vector at inference time.
-
-| Included view | Features | TTL |
-|---------------|----------|-----|
-| `machine_streaming_features` | 13 (raw sensors + rolling windows) | 12 hours |
-| `machine_batch_features` | 2 (daily / weekly aggregations) | 7 days |
-
----
-
-## 📚 Additional Resources
-
-### Documentation
-
-- [Feast Official Docs](https://docs.feast.dev)
-- [Redis Documentation](https://redis.io/docs)
-- [Feature Store Concepts](https://docs.feast.dev/getting-started/concepts)
-
-
-## 🤝 Contributing
-
-### Adding a New Feature
-
-1. Update `features.py` with new field
-2. Run `make run_feature_store`
-3. Update documentation
-4. Test with sample data
+- **Expected result:** Empty response `{}` with status `200`. The data is now stored in Redis with a **12-hour TTL**.
 
 ---
 
-**Built with ❤️ for production ML systems**
+### 3. Online Feature Retrieval Test (Single Entity)
+
+Verifies that Feast retrieves the data just pushed to Redis via the `machine_anomaly_service_v1` FeatureService.
+
+- **Method:** `POST`
+- **URL:** `http://localhost:8000/get-online-features`
+- **Body (JSON):**
+
+```json
+{
+  "feature_service": "machine_anomaly_service_v1",
+  "entities": {
+    "Machine_ID": [1001]
+  }
+}
+```
+
+- **Expected result:** A JSON response containing the values pushed in Test #2. The batch features `Daily_Vibration_PeakMean_Ratio` and `Weekly_Current_StdDev` will be `null` until Parquet materialization is run.
+
+---
+
+### 4. Multi-Entity Retrieval Test (Batch Retrieval)
+
+Verifies that Feast correctly handles requests for multiple machines simultaneously.
+
+- **Method:** `POST`
+- **URL:** `http://localhost:8000/get-online-features`
+- **Body (JSON):**
+
+```json
+{
+  "feature_service": "machine_anomaly_service_v1",
+  "entities": {
+    "Machine_ID": [1001, 9999]
+  }
+}
+```
+
+- **Expected result:** Two result sets. Machine `1001` returns the pushed data; machine `9999` (which does not exist) returns all `null` values with status `NOT_FOUND`.
+
+---
+
+### 5. Type Validation Test (Error Test)
+
+Tests Feast's robustness by sending an incorrect data type — a string where a `Float32` is expected.
+
+- **Method:** `POST`
+- **URL:** `http://localhost:8000/push`
+- **Body (JSON):**
+
+```json
+{
+  "push_source_name": "washing_stream_push",
+  "df": {
+    "Machine_ID": [1001],
+    "timestamp": ["2026-02-18T20:00:00Z"],
+    "Motor_RPM": ["FAST"]
+  },
+  "to": "online"
+}
+```
+
+- **Expected result:** A `400` or `500` error with a message indicating that the string could not be converted to `Float32`.
+
+---
+
+### 6. Expiration Test (TTL — Time To Live)
+
+The `machine_streaming_features` view has a `ttl` of **12 hours** (defined in `features.py`). The Redis key TTL is set to **86400 seconds (24 hours)** in `feature_store.yaml`.
+
+- **How to test:** Push data with a timestamp older than 12 hours (e.g., `2025-01-01T10:00:00Z`), then attempt to read it using Test #3.
+- **Push body:** Use the same body as Test #2, replacing the timestamp with `"2025-01-01T10:00:00Z"`.
+- **Expected result:** Status `OUTSIDE_MAX_AGE` or `null` values for all streaming features.
+
+---
+
+## Next Steps
+
+Once all tests pass, run **Batch Materialization** to populate the `machine_batch_features` view and eliminate the `null` values for `Daily_Vibration_PeakMean_Ratio` and `Weekly_Current_StdDev`:
+
+```bash
+# Inside the feature_store_service container
+uv run feast materialize-incremental $(date -u +"%Y-%m-%dT%H:%M:%S")
+```
+
+This reads from the partitioned Parquet files at `/data/offline/machines_batch_features` and loads the computed aggregations into Redis.
