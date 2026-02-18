@@ -27,7 +27,6 @@ Usage
 import os
 from datetime import datetime, timezone
 
-import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -36,8 +35,8 @@ import pyarrow.parquet as pq
 # PATHS
 # ──────────────────────────────────────────────────────────────────────────────
 
-STREAM_PARQUET_PATH = "/offline/machines_stream_source/streaming_feature_backfill.parquet"
-BATCH_FEATURES_DIR  = "/offline/machines_batch_features/"
+STREAM_PARQUET_PATH = "data/offline/machines_stream_source/streaming_feature_backfill.parquet"
+BATCH_FEATURES_DIR  = "data/offline/machines_batch_features/"
 BATCH_INIT_FILE     = os.path.join(BATCH_FEATURES_DIR, "_init_schema.parquet")
 
 
@@ -52,7 +51,7 @@ BATCH_INIT_FILE     = os.path.join(BATCH_FEATURES_DIR, "_init_schema.parquet")
 STREAM_SCHEMA = pa.schema([
     # ── Feast / entity columns ────────────────────────────────────────────────
     pa.field("Machine_ID",                      pa.int64()),
-    pa.field("event_timestamp",                 pa.timestamp("us", tz="UTC")),
+    pa.field("timestamp",                       pa.timestamp("us", tz="UTC")),
     pa.field("created",                         pa.timestamp("us", tz="UTC")),
 
     # ── Raw sensor readings ───────────────────────────────────────────────────
@@ -76,8 +75,7 @@ STREAM_SCHEMA = pa.schema([
 BATCH_SCHEMA = pa.schema([
     # ── Feast / entity columns ────────────────────────────────────────────────
     pa.field("Machine_ID",                      pa.int64()),
-    pa.field("event_timestamp",                 pa.timestamp("us", tz="UTC")),
-    pa.field("created",                         pa.timestamp("us", tz="UTC")),
+    pa.field("timestamp",                       pa.timestamp("us", tz="UTC")),
 
     # ── Batch / aggregated features ───────────────────────────────────────────
     pa.field("Daily_Vibration_PeakMean_Ratio",  pa.float32()),

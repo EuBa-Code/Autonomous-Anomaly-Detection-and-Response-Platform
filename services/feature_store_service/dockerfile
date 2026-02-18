@@ -19,11 +19,11 @@ RUN apt-get update \
 # Copy dependency definition files to the working directory
 COPY pyproject.toml uv.lock ./
 
-RUN uv sync --frozen --no-dev --group feature_store
+RUN uv sync --frozen --no-dev --group feature-store
 
 # Create necessary folders for the Feast Registry (metadata) and Offline Store (Parquet files).
 COPY services/feature_store_service .
 
-RUN mkdir -p /feature_store_service/data/registry /feature_store_service/data/offline 
+RUN mkdir -p /data/registry /data/offline 
              
 WORKDIR /feature_store_service

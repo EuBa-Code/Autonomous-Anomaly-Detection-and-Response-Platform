@@ -76,7 +76,6 @@ machine_streaming_features = FeatureView(
         Field(name="Current_Imbalance_RollingMean_5min", dtype=Float32),
     ],
     source=machines_stream_source,
-    online=True,
 )
 
 
@@ -110,5 +109,4 @@ machine_batch_features = FeatureView(
         Field(name="Weekly_Current_StdDev", dtype=Float32),
     ],
     source=machines_batch_source,
-    online=False,
 )

@@ -83,13 +83,13 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     volumes:
-      - ./data/registry:/feature_store_service/data/registry
-      - ./data/offline:/feature_store_service/data/offline
+      - ./data/registry:/data/registry
+      - ./data/offline:/data/offline
       - ./services/feature_store_service:/feature_store_service:ro
     networks:
       - anomaly-detection-network
+    command: ["uv", "run", "feast", "apply"]
     restart: 'no'  # Run once only
-    # Command is already "feast apply" in Dockerfile
 
   # ============================================================================
   # FEAST FEATURE SERVER - Serve Features via HTTP API
@@ -108,8 +108,8 @@ services:
       - PYTHONUNBUFFERED=1
       - FEAST_REPO_PATH=/feature_store_service
     volumes:
-      - ./data/registry:/feature_store_service/data/registry
-      - ./data/offline:/feature_store_service/data/offline
+      - ./data/registry:/data/registry
+      - ./data/offline:/data/offline
       - ./services/feature_store_service:/feature_store_service:ro
     ports:
       - "6566:6566"

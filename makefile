@@ -57,6 +57,7 @@ run_all:
 
 run_feature_store:
 	uv sync
+	uv run -m --group data-offline utils.create_offline_files 
 	docker compose up -d redis redpanda
 	docker compose up --build --abort-on-container-exit feature_store_apply
 	docker compose up --build -d feature_store_service
