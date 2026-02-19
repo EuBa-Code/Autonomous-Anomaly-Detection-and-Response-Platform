@@ -46,6 +46,17 @@ spark-services = [
 data-offline = [
     "pyarrow>=19.0.1",
 ]
+training-pipeline = [
+    "feast[redis]>=0.58.0",
+    "mlflow>=3.9.0",
+    "numpy>=2.4.1",
+    "pandas>=2.3.3",
+    "pydantic-settings>=2.11.0",
+    "scikit-learn>=1.8.0",
+]
+mlflow = [
+    "mlflow>=3.9.0",
+]
 
 [[tool.uv.index]]
 name = "pytorch-cu126"
