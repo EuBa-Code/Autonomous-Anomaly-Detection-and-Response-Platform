@@ -1,8 +1,7 @@
 import logging
-import joblib
 import pandas as pd
 from quixstreams import Application
-from config.config import Config, IsolationForestConfig
+from config.config import Config
 
 # Configure logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -10,7 +9,6 @@ logger = logging.getLogger("StreamingService")
 
 from feast import FeatureStore
 import os
-import preprocessor # Required for joblib loading
 
 def run_streaming_service():
     """
@@ -18,22 +16,11 @@ def run_streaming_service():
     It performs:
     1. Consumption from Redpanda
     2. Real-time metrics calculation (Rolling Windows)
-    3. Normalization using pre-trained Scaler
-    4. Production of enriched features to 'processed-telemetry'
-    5. Push to Feast Online Store (Redis)
+    3. Production of enriched features to 'processed-telemetry' (Unscaled)
+    4. Push to Feast Online Store (Redis)
     """
     
-    # 1. Load Preprocessor Artifact
-    preprocessor_path = IsolationForestConfig.PREPROCESSOR_JOBLIB
-    
-    if not preprocessor_path.exists():
-        logger.error(f"Preprocessor artifact not found at {preprocessor_path}. Please run training first.")
-        return
-
-    logger.info(f"Loading preprocessor from {preprocessor_path}...")
-    preprocessor = joblib.load(preprocessor_path)
-
-    # 2. Initialize Feast and Quix
+    # 1. Initialize Feast and Quix
     repo_path = os.getenv("FEAST_REPO_PATH", "/streaming_service")
     try:
         store = FeatureStore(repo_path=repo_path)
@@ -53,33 +40,21 @@ def run_streaming_service():
 
     sdf = app.dataframe(input_topic)
 
-    # 3. Feature Engineering & Preprocessing
+    # 2. Feature Engineering & Redis Push
     def process_and_push(data):
         try:
             # Metadata
             machine_id = data.get("Machine_ID", "Unknown")
             timestamp_str = data.get("timestamp", "Unknown")
 
-
             # Simple simulation of "complex" real-time metric
             vibration = data.get("Vibration_mm_s", 0)
             data["Vibration_RollingMax_10min"] = vibration * 1.05 # Aggregation placeholder
             
-            # Prepare for AI: Convert to DataFrame for the preprocessor
+            # Prepare for Feast: Convert to DataFrame
             df_row = pd.DataFrame([data])
             
-            # Apply Normalization
-            transformed_features = preprocessor.transform(df_row)
-            
-            # Build result for next topic
-            result = {
-                "Machine_ID": machine_id,
-                "timestamp": timestamp_str,
-                "features": transformed_features[0].tolist(),
-                "raw_data": data
-            }
-            
-            # 4. PUSH TO FEAST (Online Store)
+            # 3. PUSH TO FEAST (Online Store)
             # Create a DataFrame that matches the Feast FeatureView schema
             # We must ensure the timestamp is a datetime object
             feast_df = df_row.copy()
@@ -89,6 +64,13 @@ def run_streaming_service():
             store.push("washing_stream_source", feast_df)
             
             logger.info(f"Processed and pushed telemetry for {machine_id} to Redis")
+
+            # Build result for next topic (optional debug)
+            result = {
+                "Machine_ID": machine_id,
+                "timestamp": timestamp_str,
+                "data": data
+            }
             return result
             
         except Exception as e:
@@ -99,7 +81,7 @@ def run_streaming_service():
     sdf = sdf.apply(process_and_push)
     sdf = sdf.filter(lambda x: x is not None)
     
-    # 5. Sink to Redpanda
+    # 4. Sink to Redpanda (Debug Topic)
     sdf = sdf.to_topic(output_topic)
 
     logger.info("Quix Streaming Service started successfully.")
