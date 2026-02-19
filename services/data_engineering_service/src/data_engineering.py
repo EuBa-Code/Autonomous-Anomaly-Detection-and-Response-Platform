@@ -365,12 +365,7 @@ class FeatureEngineering:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _validate_batch_feature(self, df: Any, feature_name: str, aggregation: str):
-        """Light-weight sanity check for a batch-aggregated column.
-
-        Note: null values in the first calendar period per machine are EXPECTED
-        and intentional (first-period guard).  The validator reports the null
-        count for information only and does NOT treat it as a warning.
-        """
+        """Light-weight sanity check for a batch-aggregated column."""
         logger.info(f"  Validating batch feature: {feature_name}")
 
         null_count = df.filter(F.col(feature_name).isNull()).count()
@@ -387,10 +382,18 @@ class FeatureEngineering:
             F.max(feature_name).alias('max_val'),
             F.mean(feature_name).alias('mean_val'),
         ).collect()[0]
-        logger.info(
-            f"  Statistics: min={stats['min_val']:.4f}, "
-            f"max={stats['max_val']:.4f}, mean={stats['mean_val']:.4f}"
-        )
+        
+        # FIX: Check for None values before formatting
+        if stats['min_val'] is None or stats['max_val'] is None or stats['mean_val'] is None:
+             logger.info(
+                f"  Statistics: All values are null. (This usually happens if the dataset "
+                f"only spans a single period and was caught by the first-period guard)."
+            )
+        else:
+            logger.info(
+                f"  Statistics: min={stats['min_val']:.4f}, "
+                f"max={stats['max_val']:.4f}, mean={stats['mean_val']:.4f}"
+            )
 
     def _apply_batch_features(self, df: Any) -> Any:
         """
