@@ -243,13 +243,11 @@ services:
       - PYTHONPATH=/training_service
       - PYTHONUNBUFFERED=1
     volumes:
-      - ./data/registry:/feature_store_service/data/registry
-      - ./data/offline:/feature_store_service/data/offline
       - ./data:/training_service/data
       - ./models:/training_service/models
       - ./logs:/training_service/logs
       - ./outputs:/training_service/outputs
-      - ./services/feature_store_service/config:/training_service/services/feature_store_service/config:ro
+      - ./services/feature_store_service/src:/training_service/services/feature_store_service/src:ro
     restart: "no"
 
 networks:
