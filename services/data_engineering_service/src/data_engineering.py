@@ -231,6 +231,23 @@ class FeatureEngineering:
           2. Derived column – set 'source_expression: derived' + 'derived_column'
              in the YAML entry; the column must have been pre-built by
              _compute_derived_columns().
+
+        Minimum-window guard
+        --------------------
+        A rolling aggregation computed over a partial window (e.g. only 3 minutes
+        of data for a 5-minute window) is misleading — it silently under-samples
+        the signal and makes the feature incomparable across rows.
+
+        Fix: after computing each feature we null out every row whose elapsed time
+        since the machine's FIRST record is strictly less than the window duration.
+        Only once a machine has accumulated at least <window_duration> seconds of
+        history does the feature become non-null.
+
+        Example (5-minute window, data starts 2024-01-01 00:00:00):
+          00:00:00 → null   (0 s elapsed  < 300 s)
+          00:02:30 → null   (150 s elapsed < 300 s)
+          00:05:00 → value  (300 s elapsed == 300 s  ✓ full window)
+          00:07:00 → value  (420 s elapsed  > 300 s  ✓ full window)
         """
         logger.info("Applying streaming (rolling window) features")
         
@@ -246,6 +263,19 @@ class FeatureEngineering:
 
         # Pre-compute any derived scalar columns needed by rolling features
         df = self._compute_derived_columns(df)
+
+        # ── Pre-compute per-machine first-record timestamp (epoch seconds) ────
+        # Used by the minimum-window guard applied to every streaming feature.
+        # A single unbounded partition window is far cheaper than one per feature.
+        _FIRST_TS_COL = "_machine_first_ts_epoch_"
+        machine_window = Window.partitionBy(*partition_cols)
+        df = df.withColumn(
+            _FIRST_TS_COL,
+            F.min(F.col(timestamp_col).cast("long")).over(machine_window)
+        )
+        logger.info(
+            f"  Pre-computed per-machine first-record timestamp → '{_FIRST_TS_COL}'"
+        )
         
         # Process each enabled rolling feature (add any new one in the YAML)
         for feature_config in self.config['rolling_features']:
@@ -290,12 +320,36 @@ class FeatureEngineering:
             else:
                 logger.warning(f"Unknown aggregation: {aggregation} for feature {feature_name}")
                 continue
+
+            # ── Minimum-window guard ──────────────────────────────────────────
+            # Null out any row where the machine has not yet accumulated a full
+            # window of history.  We compare the current row's epoch timestamp
+            # against the machine's first-record epoch timestamp; if the gap is
+            # less than the required window duration the feature is set to null.
+            #
+            # Condition to KEEP the value (set to null otherwise):
+            #   current_epoch - machine_first_epoch >= window_duration_seconds
+            elapsed_expr = (
+                F.col(timestamp_col).cast("long") - F.col(_FIRST_TS_COL)
+            )
+            df = df.withColumn(
+                feature_name,
+                F.when(elapsed_expr >= window_duration_seconds, F.col(feature_name))
+                 .otherwise(F.lit(None).cast("double"))
+            )
+            logger.info(
+                f"  ✓ Minimum-window guard applied: first {window_duration_seconds}s "
+                f"per machine will be null for '{feature_name}'"
+            )
             
             # Validate the rolling window calculation
             if self.config.get('data_quality', {}).get('validate_rolling_windows', True):
                 self._validate_rolling_feature(df, feature_name, source_column, aggregation)
             
             logger.info(f"✓ Created streaming feature: {feature_name}")
+
+        # Drop the helper column — not part of the output schema
+        df = df.drop(_FIRST_TS_COL)
         
         # CRITICAL: re-sort so output order is timestamp → Machine_ID (required format)
         logger.info(
@@ -311,12 +365,20 @@ class FeatureEngineering:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _validate_batch_feature(self, df: Any, feature_name: str, aggregation: str):
-        """Light-weight sanity check for a batch-aggregated column."""
+        """Light-weight sanity check for a batch-aggregated column.
+
+        Note: null values in the first calendar period per machine are EXPECTED
+        and intentional (first-period guard).  The validator reports the null
+        count for information only and does NOT treat it as a warning.
+        """
         logger.info(f"  Validating batch feature: {feature_name}")
 
         null_count = df.filter(F.col(feature_name).isNull()).count()
         if null_count > 0:
-            logger.warning(f"  ⚠ {null_count} null values found in {feature_name}")
+            logger.info(
+                f"  ℹ {null_count} null values in '{feature_name}' "
+                f"(expected: first calendar period per machine is intentionally null)"
+            )
         else:
             logger.info(f"  ✓ No null values in {feature_name}")
 
@@ -438,7 +500,46 @@ class FeatureEngineering:
 
             # ── Step 3: join aggregate back to every row ─────────────────────
             join_keys = [*partition_cols, PERIOD_COL]
-            df = df.join(agg_df, on=join_keys, how='left').drop(PERIOD_COL)
+            df = df.join(agg_df, on=join_keys, how='left')
+
+            # ── Step 4: null out the first (incomplete) period per machine ────
+            #
+            # The first calendar period a machine appears in (day or week) is
+            # almost always INCOMPLETE: data collection started mid-day or
+            # mid-week, so the aggregation is computed on fewer observations
+            # than a full period contains.  Providing a value for this period
+            # is misleading because the ML model cannot distinguish "quiet
+            # machine" from "machine we only watched for 3 hours today".
+            #
+            # Fix: identify each machine's earliest period, then force the
+            # feature column to null for every row that falls inside it.
+            #
+            # Timeline example (daily feature, data starts 2024-01-01 06:00):
+            #   period 2024-01-01 → NULL  (only 18 h of data — incomplete day)
+            #   period 2024-01-02 → value (full 24 h ✓)
+            #   period 2024-01-03 → value (full 24 h ✓)
+            #
+            # Timeline example (weekly feature, data starts 2024-01-01):
+            #   week  2024-W01   → NULL  (< 7 days — incomplete week)
+            #   week  2024-W02   → value (full 7 days ✓)
+            _FIRST_PERIOD_COL = "_batch_first_period_"
+            machine_window = Window.partitionBy(*partition_cols)
+            df = df.withColumn(
+                _FIRST_PERIOD_COL,
+                F.min(PERIOD_COL).over(machine_window)
+            )
+            df = df.withColumn(
+                feature_name,
+                F.when(
+                    F.col(PERIOD_COL) == F.col(_FIRST_PERIOD_COL),
+                    F.lit(None).cast("double")         # first period → null
+                ).otherwise(F.col(feature_name))       # subsequent periods → keep value
+            )
+            df = df.drop(PERIOD_COL, _FIRST_PERIOD_COL)
+            logger.info(
+                f"  ✓ First-period guard applied: first {aggregation_type} period "
+                f"per machine will be null for '{feature_name}'"
+            )
 
             # Validate
             if self.config.get('data_quality', {}).get('validate_batch_features', True):
