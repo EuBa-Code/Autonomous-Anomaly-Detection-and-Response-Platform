@@ -125,3 +125,8 @@ clean:
 	@echo "Cleaning up: stopping containers and removing volumes..."
 	docker compose down -v
 	@echo "Environment cleaned."
+
+all:
+	run_all
+	build_all
+	all_up
