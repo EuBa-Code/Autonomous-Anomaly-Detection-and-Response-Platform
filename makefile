@@ -126,7 +126,4 @@ clean:
 	docker compose down -v
 	@echo "Environment cleaned."
 
-all:
-	run_all
-	build_all
-	all_up
+all: run_all build_all all_up
