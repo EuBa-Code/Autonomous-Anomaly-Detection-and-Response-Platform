@@ -6,7 +6,7 @@ Creates TWO datasets:
 2. Dataset with 2% anomalies
 
 MODIFICATIONS:
-- 10 washing machines (instead of 50)
+- 3 washing machines (instead of 50)
 - All machines report data at the same timestamp (every second)
 """
 
@@ -19,7 +19,7 @@ from pyspark.sql.types import *
 from pyspark.sql.window import Window
 
 from services.create_datasets_service.config import DATASETS_PATH
-def generate_industrial_washer_datasets(spark, num_rows=1_000_000, anomaly_rate=0.02, streaming : bool = False):
+def generate_industrial_washer_datasets(spark, num_rows=100_000, anomaly_rate=0.02, streaming : bool = False):
     """
     Generate two industrial washing machine sensor datasets.
     
@@ -40,7 +40,7 @@ def generate_industrial_washer_datasets(spark, num_rows=1_000_000, anomaly_rate=
     """
     
     print(f"Generating {num_rows:,} rows of industrial washing machine data...")
-    print(f"Configuration: 10 machines, synchronized timestamps (1 second intervals)")
+    print(f"Configuration: 3 machines, synchronized timestamps (1 second intervals)")
     
     # =========================================================================
     # STEP 1: Generate base normal dataset
@@ -86,11 +86,11 @@ def generate_industrial_washer_datasets(spark, num_rows=1_000_000, anomaly_rate=
     df = base_df.select(
         # Timestamp advances every 10 rows (every second) relative to start_time_expr
         from_unixtime(
-            start_time_expr + floor(col("row_id") / 10)
+            start_time_expr + floor(col("row_id") / 3)
         ).alias("timestamp"),
         
-        # 10 different industrial washing machines (cycles through 1-10 for each timestamp)
-        ((col("row_id") % 10) + 1).alias("Machine_ID"),
+        # 3 different industrial washing machines (cycles through 1-3 for each timestamp)
+        ((col("row_id") % 3) + 1).alias("Machine_ID"),
         
         # Cycle phases: 0=Idle, 1=Fill, 2=Heat, 3=Wash, 4=Rinse, 5=Spin, 6=Drain
         (expr("floor(rand() * 7)")).cast("int").alias("Cycle_Phase_ID"),
@@ -328,7 +328,7 @@ def generate_industrial_washer_datasets(spark, num_rows=1_000_000, anomaly_rate=
     print(f"✓ Anomaly dataset created: {anomaly_df.count():,} rows")
     print(f"  - Normal records: {num_rows - anomaly_count:,}")
     print(f"  - Anomalous records: {anomaly_count:,} ({anomaly_percentage:.2f}%)")
-    print(f"  - Unique timestamps: {num_rows // 10:,} (10 machines per timestamp)")
+    print(f"  - Unique timestamps: {num_rows // 3:,} (3 machines per timestamp)")
     
     return normal_df, anomaly_df
 

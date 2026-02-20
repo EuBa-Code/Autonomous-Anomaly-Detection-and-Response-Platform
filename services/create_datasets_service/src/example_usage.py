@@ -25,13 +25,13 @@ spark = SparkSession.builder \
 print("Generating datasets...")
 normal_df, anomaly_df = generate_industrial_washer_datasets(
     spark=spark,
-    num_rows=6_000_000,
+    num_rows=500_000,
     anomaly_rate=0.02
 )
 
 normal_streaming_df, anomaly_streaming_df = generate_industrial_washer_datasets(
     spark=spark,
-    num_rows=100_000,
+    num_rows=10_000,
     anomaly_rate=0.02,
     streaming=True
 )

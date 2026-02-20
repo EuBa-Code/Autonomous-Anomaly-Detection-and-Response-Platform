@@ -15,7 +15,7 @@ RUN mkdir -p ./data/raw \
             ./metrics \
             ./logs
 
-ENV PYTHONPATH="/training:/training/src"
-ENV PATH="/training/.venv/bin:$PATH"
+ENV PYTHONPATH="/training_service:/training/src"
+ENV PATH="/training_service/.venv/bin:$PATH"
 
 CMD ["uv", "run", "-m", "src.train"]

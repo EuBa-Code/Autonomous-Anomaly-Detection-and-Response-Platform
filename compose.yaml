@@ -229,6 +229,12 @@ services:
       context: .
       dockerfile: services/training_service/Dockerfile
     container_name: training_pipeline
+    deploy:
+      resources:
+        limits:
+          memory: 4g      
+        reservations:
+          memory: 2g        
     depends_on:
       mlflow:
         condition: service_healthy

@@ -67,3 +67,5 @@ data/pyspark_metadata
 # Feature Store
 data/registry
 
+# Training
+outputs/
