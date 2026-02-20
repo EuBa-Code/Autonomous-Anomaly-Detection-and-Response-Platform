@@ -202,9 +202,10 @@ services:
       - --port
       - "5000"
       - --backend-store-uri
-      - sqlite:////mlflow/mlflow.db
+      - sqlite:////mlruns/mlflow.db
       - --artifacts-destination
-      - /mlflow/artifacts
+      - /mlruns/artifacts
+      - --serve-artifacts
       - --allowed-hosts
       - "*"
     ports:
@@ -244,11 +245,13 @@ services:
       - anomaly-detection-network
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_ARTIFACT_URI=mlflow-artifacts:/
       - MLFLOW_EXPERIMENT_NAME=isolation_forest_prod
       - MODEL_NAME=if_anomaly_detector
       - PYTHONPATH=/training_service
       - PYTHONUNBUFFERED=1
     volumes:
+    - mlflow_data:/mlruns 
     - ./data:/training_service/data
     - ./models:/training_service/models
     - ./logs:/training_service/logs

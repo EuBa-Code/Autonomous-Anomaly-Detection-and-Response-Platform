@@ -7,7 +7,8 @@
         mlflow_up training_up all_up \
         mlflow_down training_down all_down \
         mlflow_logs training_logs all_logs \
-        run_all clean
+        run_all clean \
+		all
 
 # ----------------------------------------------
 # Display help message
@@ -126,7 +127,8 @@ clean:
 	docker compose down -v
 	@echo "Environment cleaned."
 
-all:
-	run_all
-	build_all
-	all_up
+all: final_datasets run_feature_store build_mlflow build_training mlflow_up training_up
+	@echo "All services are up and running."
+	
+	
+	
