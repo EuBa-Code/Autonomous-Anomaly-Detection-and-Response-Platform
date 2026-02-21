@@ -64,6 +64,7 @@ training-pipeline = [
 ]
 mlflow = [
     "mlflow>=3.9.0",
+]
 streaming = [
     "quixstreams>=3.0.0",
     "pandas>=2.2.0",

@@ -341,6 +341,7 @@ services:
       context: .
       dockerfile: services/training_service/Dockerfile
     container_name: training_pipeline
+    profiles: [ "setup" ] 
     deploy:
       resources:
         limits:
