@@ -38,10 +38,10 @@ training_ml = [
     "mlflow>=2.10.0",
 ]
 feature-store = [
-    "feast[redis]>=0.58.0",
+    "feast[redis,duckdb]>=0.58.0",
 ]
 feature_store_apply = [
-    "feast[redis]>=0.58.0",
+    "feast[redis,duckdb]>=0.58.0",
 ]
 dataset-creation-2 = [
     "scikit-learn>=1.8.0",
@@ -58,7 +58,7 @@ data-offline = [
     "pyarrow>=19.0.1",
 ]
 training-pipeline = [
-    "feast[redis]>=0.58.0",
+    "feast[redis,duckdb]>=0.58.0",
     "mlflow>=3.9.0",
     "numpy>=2.4.1",
     "pandas>=2.3.3",

@@ -231,16 +231,22 @@ services:
         condition: service_completed_successfully
       mlflow:
         condition: service_started
+      feature_store_apply:
+        condition: service_completed_successfully
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - PYTHONUNBUFFERED=1
     volumes:
-      # Training reads processed data written by hist_ingestion
-      - ./data/processed_datasets:/training/data/raw:ro
+      # Training reads processed data
+      - ./data:/training_service/data
       # Training writes model artifacts (model + preprocessor)
-      - ./data/models:/training/models
+      - ./data/models:/training_service/models
       # Training writes metrics
-      - ./data/metrics:/training/metrics
+      - ./data/metrics:/training_service/metrics
+      # Feast Configuration and Registry
+      - ./services/feature_store_service/src:/training_service/feature_store_service/src:ro
+      - ./data/registry:/data/registry
+      - ./data/offline:/data/offline
     networks:
       - anomaly-detection-network
     restart: 'no'

@@ -16,25 +16,42 @@ class DataManager:
         
     def load_data(self) -> pd.DataFrame:
         """
-        Carica i dati elaborati da PySpark.
-        Bypassa Feast (get_historical_features) per il training poiché i dati
-        in /data/offline/machines_batch_features contengono già tutte le 
-        feature temporali (rolling e batch) aggiunte dal Data Engineering service.
-        Questo evita il blocco memoria di Dask durante il point-in-time join.
+        Carica i dati elaborati da PySpark tramite Feast per verificare performance e skew.
         """
-        logger.info(f"[DATA] Loading historical PySpark features directly from {self.s.entity_df_path}")
+        import time
+        t0 = time.time()
+        logger.info("[FEAST] Inizializzazione FeatureStore...")
+        # Il FeatureStore viene già inizializzato in __init__
+        logger.info(f"[FEAST] FeatureStore pronto in {time.time()-t0:.4f}s")
+
+        t1 = time.time()
+        logger.info("[FEAST] Lettura entity_df dal percorso Spark...")
+        # Carichiamo solo le colonne minime necessarie per Feast
+        entity_df = pd.read_parquet(self.s.entity_df_path)[["Machine_ID", "timestamp"]]
         
-        # Leggi l'intera directory Parquet elaborata precedentemente da Spark
-        df = pd.read_parquet(self.s.entity_df_path)
+        # Rinomina per chiarezza verso Feast
+        entity_df.rename(columns={"timestamp": "event_timestamp"}, inplace=True)
         
         # Mantieni UTC coerentemente
-        df[self.s.event_timestamp_column] = pd.to_datetime(
-            df[self.s.event_timestamp_column], utc=True
+        entity_df["event_timestamp"] = pd.to_datetime(
+            entity_df["event_timestamp"], utc=True
         )
-        
-        logger.info(f"[DATA] Loaded {len(df)} rows ready for training")
+        logger.info(f"[FEAST] entity_df letto in {time.time()-t1:.2f}s — {len(entity_df)} righe")
 
-        return df
+        t2 = time.time()
+        logger.info(f"[FEAST] Avvio get_historical_features utilizzando il service: {self.s.feature_service_name}...")
+        
+        # Recupero delle feature storiche tramite Feast
+        # Se si blocca qui, il problema è del Point-in-Time Join (Dask/Memory)
+        training_df = self.store.get_historical_features(
+            entity_df=entity_df,
+            features=self.store.get_feature_service(self.s.feature_service_name)
+        ).to_df()
+        
+        logger.info(f"[FEAST] get_historical_features completato in {time.time()-t2:.2f}s")
+        logger.info(f"[FEAST] Totale load_data: {time.time()-t0:.2f}s — {len(training_df)} righe caricate")
+
+        return training_df
 
 """    
         def prepare_features(self, df, drop_cols):
