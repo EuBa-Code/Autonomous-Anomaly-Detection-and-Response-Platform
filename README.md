@@ -5,70 +5,70 @@ Built with **FastAPI**, **Apache Spark**, **Feast**, **Redpanda**, **Quix Stream
 
 ## 🚀 Architecture
 
-1.  **Data Generation**: Synthetic telemetry data (Vibration, Temperature, etc.) generated via Spark.
-2.  **Feature Engineering**: Batch processing (Spark) for historical features, Real-time processing (Quix) for streaming features.
-3.  **Feature Store**: **Feast** serves features for training (Offline - Parquet) and inference (Online - Redis).
-4.  **Training**: Isolation Forest model trained on historical data and tracked/versioned in **MLflow**.
-5.  **Inference**: Real-time HTTP API (FastAPI) predicts anomalies using the trained model (from MLflow) and online features.
+1.  **Data Generation & Engineering**: Synthetic telemetry data generation and batch feature engineering using **PySpark**.
+2.  **Feature Store**: **Feast** serves features for training (Offline - Parquet) and real-time inference (Online - Redis).
+3.  **Model Training**: An Isolation Forest model is automatically trained on PySpark's batch data and pushed/versioned in **MLflow**.
+4.  **Real-Time Streaming**: **Quix Streams** processes live sensor readings from **Redpanda** (Kafka) to generate rolling-window features.
+5.  **Inference Serving**: A real-time HTTP API (**FastAPI**) intercepts data and predicts anomalies using the MLflow model and Redis online features.
 
 ## 🛠️ Prerequisites
 
 -   **Docker Desktop** (with at least 4GB RAM allocated).
--   **Make** (optional, but recommended for easy commands).
--   **Curl** or **Postman** for testing.
+-   **Make** (optional, but highly recommended for the commands below).
 
-## 🏁 Quick Start
+---
 
-### 1. Clean Environment
-Ensure a clean state to avoid conflicts:
+## 🏁 Quick Start: The 3-Step Pipeline
+
+The entire system is orchestrated via Docker Compose profiles and `Make` commands to guarantee sequence and stability.
+
+### STEP 0: Clean State (Optional but recommended)
+Ensure you have a completely clean state to avoid cache conflicts or old volumes.
 ```bash
 make clean
 ```
 
-### 2. Run Offline Pipeline (Batch)
-Starts infrastructure (MLflow, Redis), generates data, ingests historical features, and trains the model.
+### STEP 1: Offline Setup & Training
+Automatically generates the synthetic datasets, runs PySpark to extract features, provisions the Feast registry, and trains the MLflow anomaly detection model.
 ```bash
-make pipeline
+make setup
 ```
-> **Note:** This step may take a few minutes. Check progress with `make logs-train`.
+> **⏳ Wait for Completion:** This phase takes ~2-3 minutes.
+> Run `make logs-setup` and wait until you see: `TRAINING #1 COMPLETATO CON SUCCESSO!`.
 
-### 3. Start Real-Time Services
-Launches Redpanda, Streaming Service, and Inference API.
+### STEP 2: Online Inference & Streaming Services
+Once the training is done, spin up the real-time AI agents (FastAPI Inference Server, Feast HTTP Server, Quix Streaming Service).
 ```bash
-make streaming
+make online
 ```
+> You can monitor their startup with `make logs-online`.
 
-### 4. Start Simulation (Data Producer)
-Begins streaming telemetry data to the system.
+### STEP 3: Start the Telemetry Simulation
+The system is hungry for live data. Launch the producer to simulate machines sending sensor telemetry to the broker.
 ```bash
-make simulate
+make simulation
 ```
-> **Tip:** Open a separate terminal to run this command, or check logs with `docker logs -f producer_service`.
+> Track the data flow with `make logs-simulation`.
 
-## 📊 Monitoring
-- **MLflow UI**: [http://localhost:5000](http://localhost:5000) (Experiments & Models)
-- **Redpanda Console**: [http://localhost:8080](http://localhost:8080) (Topics & Messages)
-- **FastAPI Docs**: [http://localhost:8000/docs](http://localhost:8000/docs) (Prediction API)
+---
 
-**Expected Response:**
-```json
-{
-  "machine_id": 1,
-  "is_anomaly": 0,
-  "anomaly_score": -0.1234,
-  "model_version": "v1"
-}
+## 📊 Dashboard & Monitoring
+
+Once everything is running, explore the following interfaces in your browser:
+
+- 🧠 **MLflow Tracking UI**: [http://localhost:5000](http://localhost:5000) (Check models and metrics)
+- 🐼 **Redpanda Console**: [http://localhost:8080](http://localhost:8080) (Inspect Kafka topics & messages)
+- 🍇 **Feast Feature Server**: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI for Feast APIs)
+- 🔮 **FastAPI Inference**: `http://localhost:8001/docs` (Swagger UI for Predictions - note port depends on inference setup)
+
+## 🛑 Shutting Down
+
+To elegantly stop the cluster without losing data (volumes preserved):
+```bash
+make stop
 ```
 
-## 📂 Project Structure
-
--   `services/`: Microservices source code (Inference, Streaming, Feature Store, etc.).
--   `data/`: Generated datasets and model artifacts (ignored in Git).
--   `compose.yaml`: Docker Compose configuration.
--   `makefile`: Shortcut commands.
-
-## 🐛 Troubleshooting
-
--   **OOM Kill (Exit 137)**: Increase Docker RAM or check `SPARK_DRIVER_MEMORY` in `compose.yaml`.
--   **Redpanda Disk Full**: Run `make prune` to clear old volumes.
--   **Missing Features**: Ensure `make simulate` is running and the Producer is active.
+To totally reset the project and wipe the synthetic data databases and models:
+```bash
+make clean
+```
