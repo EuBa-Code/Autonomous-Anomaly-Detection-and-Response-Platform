@@ -20,9 +20,9 @@ RUN uv sync --frozen --no-dev --group streaming
 
 # Copy source code and config
 COPY services/streaming_service/src ./src/
-COPY config ./config/
+COPY services/streaming_service/config ./config/
 # Copy feast config too
-COPY services/feature_store_service/config/feature_store.yaml ./feature_store.yaml
+COPY services/feature_store_service/src/feature_store.yaml ./feature_store.yaml
 
 # Protocol requires config/ folder inside the service if needed
 # For now we use the global config as requested in some READMEs

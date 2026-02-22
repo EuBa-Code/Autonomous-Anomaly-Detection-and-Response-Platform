@@ -18,6 +18,7 @@ services:
       - --mode dev-container
       - --smp 1
       - --default-log-level=info
+      - --overprovisioned
     ports:
       - "18081:18081" # Schema Registry
       - "18082:18082" # Pandaproxy
@@ -187,7 +188,8 @@ services:
       - FEAST_REPO_PATH=/feature_loader_service
     volumes:
       - ./data/processed_datasets:/app/data/processed_datasets:ro
-      - ./data/registry:/app/data/registry
+      - ./data/registry:/data/registry
+      - ./data/offline:/data/offline:ro
     networks:
       - anomaly-detection-network
     restart: 'no'
@@ -225,10 +227,10 @@ services:
     container_name: training_service
     profiles: [ "setup" ]
     depends_on:
-      hist_ingestion:
+      data_engineering:
         condition: service_completed_successfully
       mlflow:
-        condition: service_healthy
+        condition: service_started
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - PYTHONUNBUFFERED=1
@@ -261,7 +263,7 @@ services:
       - FEAST_REPO_PATH=/streaming_service
     volumes:
       - ./data/models:/streaming_service/data/models:ro
-      - ./data/registry:/app/data/registry
+      - ./data/registry:/data/registry
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -285,12 +287,12 @@ services:
       # Model Artifacts (Model + Preprocessor)
       - ./data/models:/inference_service/data/models:ro
       # Feast Registry and Configuration
-      # Mount to /app/data/registry because feature_store.yaml uses this absolute path
-      - ./data/registry:/app/data/registry:ro
-      - ./services/feature_store_service/config/feature_store.yaml:/inference_service/feature_store.yaml:ro
+      # Mount to /data/registry because feature_store.yaml uses this absolute path
+      - ./data/registry:/data/registry:ro
+      - ./services/feature_store_service/src/feature_store.yaml:/inference_service/feature_store.yaml:ro
 
     ports:
-      - "8000:8000"
+      - "8001:8000"
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -326,12 +328,6 @@ services:
     restart: unless-stopped
     networks:
       - anomaly-detection-network
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5000" ]
-      interval: 30s
-      timeout: 10s
-      start_period: 5s
-      retries: 3
 
   # ============================================================================
   # TRAINING PIPELINE - Run Once (or manually on schedule)
@@ -341,7 +337,7 @@ services:
       context: .
       dockerfile: services/training_service/Dockerfile
     container_name: training_pipeline
-    profiles: [ "setup" ] 
+    profiles: [ "setup" ]
     deploy:
       resources:
         limits:
@@ -350,7 +346,7 @@ services:
           memory: 2g
     depends_on:
       mlflow:
-        condition: service_healthy
+        condition: service_started
       feature_store_apply:
         condition: service_completed_successfully
     networks:
