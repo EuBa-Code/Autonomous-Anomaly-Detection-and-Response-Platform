@@ -1,12 +1,12 @@
 """
 Industrial Washing Machine Dataset Generator
-Generates 1,000,000 rows of realistic sensor data
+Generates x number rows of realistic sensor data
 Creates TWO datasets: 
 1. Normal dataset (no anomalies)
 2. Dataset with 2% anomalies
 
 MODIFICATIONS:
-- 3 washing machines (instead of 50)
+- 3 washing machines 
 - All machines report data at the same timestamp (every second)
 """
 

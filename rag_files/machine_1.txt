@@ -1,0 +1,17 @@
+Model Reference: Milnor (M-Series)
+Deployment Date: June 2021
+Criticality: High (Primary Production Line)
+
+Historical Incident & Error Log:
+
+January 2024 - Power Phase Instability: The machine experienced a series of unexplained shutdowns. Root cause was traced to the L1 Power Phase on the main circuit breaker panel. The voltage drop triggered a "Generic Anomaly" in the inverter. Note for Operator: If current draw fluctuates without a corresponding RPM change, check the L1 terminal for arcing or loose wiring.
+
+August 2024 - Bearing Degradation: Noticed a 15% increase in high-frequency noise. Replaced the drive-side bearings. The machine now has a "new baseline" vibration profile that is slightly quieter than the factory default.
+
+November 2024 - Sensor Ghosting: The internal water-level pressure switch was replaced after it falsely reported a "Dry Run" anomaly during a heavy wool cycle.
+
+Maintenance Context:
+
+Drum Characteristics: machine_1 is used for heavy linens. It is prone to "clumping" which can simulate a mechanical imbalance.
+
+Pro-Tip for Gemma: If the anomaly occurs during the first 2 minutes of the spin cycle, it is likely a load distribution issue. If it occurs after 10 minutes, it is likely thermal or electrical.
