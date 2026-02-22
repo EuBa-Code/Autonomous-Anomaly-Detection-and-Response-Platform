@@ -1,0 +1,20 @@
+Model Reference: Girbau (GENESIS / HS Series)
+Deployment Date: March 2023
+Criticality: Medium (Support Line)
+
+Historical Incident & Error Log:
+
+February 2024 - Over-Sudsing Event: A contractor used non-standard industrial soap, leading to a "Suds Lock." The foam entered the pressure tube, causing the machine to think it was overflowing. This required a manual "Deep Flush" of the sensor lines. Note for Operator: If the anomaly is accompanied by a "Slow Drain" status, inspect the detergent drawer for residue.
+
+May 2024 - Suspension Rod Fatigue: The North-East (NE) Dampening Rod snapped during a high-speed spin. It was replaced with a reinforced steel variant. As a result, the machine now leans 0.5 degrees to the left; this is normal and should not be flagged as a leveling error.
+
+September 2024 - Firmware Conflict: After the v4.2 update, the door lock solenoid occasionally fails to engage on the first try, triggering a "Mechanical Failure" anomaly. Usually, a simple "Pause/Resume" command clears this.
+
+Maintenance Context:
+
+Drain Pump: This machine has a history of catching small items (coins, clips) in the debris filter every 3-4 months.
+
+Pro-Tip for Gemma: Cross-reference the "Anomaly Detected" signal with the pump_current metric. If current is high (>1.2A), there is a physical blockage in the pump.
+
+
+

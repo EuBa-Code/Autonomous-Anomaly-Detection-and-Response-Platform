@@ -1,0 +1,17 @@
+Model Reference: Milnor (M-Series)
+Deployment Date: January 2022
+Criticality: Critical (Final Processing)
+
+Historical Incident & Error Log:
+
+December 2023 - Thermal Thermal Overload: The machine suffered a total motor burnout due to a clogged intake vent located at the rear base. The motor was replaced with a Refurbished Unit (Serial: RX-99). This motor naturally runs 5°C hotter than the original. Gemma should adjust the "Danger Zone" threshold to 85°C instead of the factory 80°C.
+
+April 2024 - Lid Lock Sync: A synchronization lag between the PLC and the lid lock caused a safety trip. The software was patched, but the hardware latch remains "sticky" in high-humidity environments.
+
+October 2024 - Base Plate Fatigue: Vibrations during the 3000 RPM phase caused the floor bolts to loosen. They were re-torqued and set in epoxy. Any vibration above 1.8 mm/s now indicates a potential floor-bond failure.
+
+Maintenance Context:
+
+High-Speed Risk: This machine is the most dangerous in the facility. Any anomaly labeled "Vibration" or "Unbalanced" must result in an immediate remote lockout until a physical inspection is performed.
+
+Pro-Tip for Gemma: Check the ambient_humidity sensor nearby. If humidity is >70%, the "Sticky Lid" anomaly is 90% likely to be the cause of the system alert.
