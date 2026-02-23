@@ -140,7 +140,7 @@ build_mlflow:
 
 build_training:
 	@echo "Building Training Pipeline..."
-	docker compose build training_pipeline
+	docker compose build training_service
 
 build_all: build_mlflow build_training
 
@@ -155,7 +155,7 @@ mlflow_up:
 
 training_up:
 	@echo "Starting Training Pipeline..."
-	docker compose up -d training_pipeline
+	docker compose up -d training_service
 
 all_up: mlflow_up training_up
 	@echo "All services are up."
@@ -166,7 +166,7 @@ mlflow_down:
 
 training_down:
 	@echo "Stopping Training Pipeline..."
-	docker compose stop training_pipeline
+	docker compose stop training_service
 
 all_down: mlflow_down training_down
 	@echo "All services stopped."
@@ -178,7 +178,7 @@ mlflow_logs:
 	docker compose logs -f mlflow
 
 training_logs:
-	docker compose logs -f training_pipeline
+	docker compose logs -f training_service
 
 all_logs:
 	docker compose logs -f
