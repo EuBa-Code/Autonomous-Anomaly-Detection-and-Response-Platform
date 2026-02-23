@@ -11,7 +11,7 @@ class Config:
     # In Docker, we map the directory containing the dataset to /producer/data/streaming_data
     # So we build the path using the mounted volume.
     DATA_DIR = Path('/producer/data/streaming_data')
-    STREAMING_DATASET_NAME = os.getenv('STREAMING_DATASET', 'synthetic_data.parquet')
+    STREAMING_DATASET_NAME = os.getenv('STREAMING_DATASET', 'industrial_washer_normal_streaming')
     
     # Absolute path to the file
     STREAMING_DATASET = DATA_DIR / STREAMING_DATASET_NAME

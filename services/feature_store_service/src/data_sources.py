@@ -25,7 +25,7 @@ machines_batch_source = FileSource(
 
 machines_stream_backing_source = FileSource(
     name='machines_stream_backing_source',
-    path='data\offline\machines_stream_source\streaming_feature_backfill.parquet',
+    path='data/offline/machines_stream_source/streaming_feature_backfill.parquet',
     timestamp_field='timestamp'
 )
 

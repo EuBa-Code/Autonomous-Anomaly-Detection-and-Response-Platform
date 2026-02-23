@@ -28,6 +28,7 @@ setup:
 online:
 	@echo "--- [2/3] Starting Online Real-Time Pipeline ---"
 	@echo "This will start the FastAPI inference server and Quix streams."
+	docker compose up redpanda redpanda-console
 	docker compose --profile online up -d --build
 
 simulation:
