@@ -93,6 +93,7 @@ def main():
 
     drop_cols = [s.event_timestamp_column, "Machine_ID"]
     x_train = df.drop(columns=[c for c in drop_cols if c in df.columns])
+    del df  # libera memoria: df originale non più necessario
     logger.info(f"[DATA] Features selezionate: {x_train.shape[1]} colonne")
 
     # 2. PIPELINE
@@ -103,19 +104,47 @@ def main():
     pipe = ModelFactory.build_pipeline(num_cols, cat_cols, s)
 
     with mlflow.start_run():
-        # 3. TRAINING
-        logger.info("[TRAIN] Fitting pipeline su TUTTO il dataset...")
+        # 3. TRAINING con subsample logico per non saturare RAM
+        # Isolation Forest converge già con poche migliaia di campioni (paper: max_samples=256).
+        # Il subsample è quindi teoricamente solido oltre che necessario per la RAM.
+        max_fit_rows = getattr(s, "max_fit_rows", 200_000)
+        if len(x_train) > max_fit_rows:
+            logger.info(f"[TRAIN] Dataset grande ({len(x_train)} righe): subsample a {max_fit_rows} righe per il fit")
+            x_fit = x_train.sample(n=max_fit_rows, random_state=42)
+        else:
+            x_fit = x_train
+            logger.info(f"[TRAIN] Dataset nella norma ({len(x_train)} righe): fit su tutto il dataset")
+
+        logger.info(f"[TRAIN] Fitting pipeline su {len(x_fit)} righe...")
         start_train = time.time()
-        pipe.fit(x_train)
+        pipe.fit(x_fit)
         train_time = time.time() - start_train
+        del x_fit  # libera il subsample di fit
         logger.info(f"[TRAIN] Training completato in {train_time:.2f}s")
 
-        # 4. INFERENCE
-        logger.info("[INFERENCE] Calcolo predizioni e scores su training data...")
+        # 4. INFERENCE chunked per non saturare RAM
+        logger.info("[INFERENCE] Calcolo predizioni e scores in chunk...")
+        infer_chunk_size = getattr(s, "inference_chunk_size", 50_000)
+        n_chunks = (len(x_train) + infer_chunk_size - 1) // infer_chunk_size
+        logger.info(f"[INFERENCE] {len(x_train)} righe divise in {n_chunks} chunk da {infer_chunk_size}")
+
         start_inference = time.time()
-        x_train_pre = pipe.named_steps["pre"].transform(x_train)
-        pred_train = pipe.predict(x_train)
-        scores_train = pipe.named_steps["model"].score_samples(x_train_pre)
+        pred_parts, score_parts, pre_parts = [], [], []
+
+        for i in range(0, len(x_train), infer_chunk_size):
+            chunk = x_train.iloc[i : i + infer_chunk_size]
+            chunk_pre = pipe.named_steps["pre"].transform(chunk)
+            pred_parts.append(pipe.predict(chunk))
+            score_parts.append(pipe.named_steps["model"].score_samples(chunk_pre))
+            pre_parts.append(chunk_pre)
+            chunk_idx = i // infer_chunk_size + 1
+            logger.info(f"[INFERENCE] Chunk {chunk_idx}/{n_chunks} processato ({len(chunk)} righe)")
+
+        pred_train   = np.concatenate(pred_parts)
+        scores_train = np.concatenate(score_parts)
+        x_train_pre  = np.concatenate(pre_parts)
+        del pred_parts, score_parts, pre_parts  # libera i buffer intermedi
+
         inference_time = time.time() - start_inference
         latency = (inference_time * 1000) / len(x_train)
         logger.info(f"[INFERENCE] Inference completato in {inference_time:.2f}s")
@@ -146,6 +175,7 @@ def main():
             "score_max": metrics["score_statistics"]["max"],
             "training_number": training_number,
             "dataset_size": len(x_train),
+            "fit_rows": min(len(x_train), getattr(s, "max_fit_rows", 200_000)),
         })
 
         # Log statistiche features per drift monitoring
@@ -163,6 +193,9 @@ def main():
         mlflow.log_param("score_distribution", json.dumps(metrics["score_distribution"]))
         mlflow.log_param("training_number", str(training_number))
         mlflow.log_param("contamination", str(s.training.contamination))
+        mlflow.log_param("max_fit_rows", str(getattr(s, "max_fit_rows", 200_000)))
+        mlflow.log_param("inference_chunk_size", str(getattr(s, "inference_chunk_size", 50_000)))
+        mlflow.log_param("feast_chunk_size", str(getattr(s, "feast_chunk_size", 50_000)))
 
         # Signature
         logger.info("[MLFLOW] Creazione signature...")

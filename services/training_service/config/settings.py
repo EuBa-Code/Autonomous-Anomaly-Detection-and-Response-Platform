@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     event_timestamp_column: str = "timestamp"              # Name of timestamp column for temporal data ordering
     output_dir: str = "outputs"                            # Directory to save JSON artifacts (history, thresholds)
     
+    feast_chunk_size: int = 50_000      # righe per chunk Feast
+    max_fit_rows: int = 200_000         # cap per il fit (subsample)
+    inference_chunk_size: int = 50_000  # righe per chunk inference
 
     class TrainingConfig(BaseModel):
         contamination: float = 0.02                        # Expected percentage of anomalies. If real dataset has <10% anomalies → IF might produce FalsePositive. If >10% → IF might miss TruePositive

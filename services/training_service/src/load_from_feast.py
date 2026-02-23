@@ -17,20 +17,19 @@ class DataManager:
     def load_data(self) -> pd.DataFrame:
         """
         Carica i dati elaborati da PySpark tramite Feast per verificare performance e skew.
+        Il caricamento avviene in chunk logici per non saturare la RAM.
         """
         import time
         t0 = time.time()
         logger.info("[FEAST] Inizializzazione FeatureStore...")
-        # Il FeatureStore viene già inizializzato in __init__
         logger.info(f"[FEAST] FeatureStore pronto in {time.time()-t0:.4f}s")
 
         t1 = time.time()
         logger.info("[FEAST] Lettura entity_df dal percorso Spark...")
-        # Carichiamo solo le colonne minime necessarie per Feast
         entity_df = pd.read_parquet(self.s.entity_df_path)
-        logger.info(f"[FEAST] Actual columns: {entity_df.columns.tolist()}")  # add this
+        logger.info(f"[FEAST] Actual columns: {entity_df.columns.tolist()}")
         entity_df = entity_df[["Machine_ID", "timestamp"]]
-        
+
         # Mantieni UTC coerentemente
         entity_df["timestamp"] = pd.to_datetime(
             entity_df["timestamp"], utc=True
@@ -39,32 +38,30 @@ class DataManager:
 
         t2 = time.time()
         logger.info(f"[FEAST] Avvio get_historical_features utilizzando il service: {self.s.feature_service_name}...")
-        
-        # Recupero delle feature storiche tramite Feast
-        # Se si blocca qui, il problema è del Point-in-Time Join (Dask/Memory)
-        training_df = self.store.get_historical_features(
-            entity_df=entity_df,
-            features=self.store.get_feature_service(self.s.feature_service_name)
-        ).to_df()
-        
+
+        # --- CHUNKED LOADING: divide entity_df in batch per non saturare RAM ---
+        chunk_size = getattr(self.s, "feast_chunk_size", 50_000)
+        chunks = [
+            entity_df.iloc[i : i + chunk_size]
+            for i in range(0, len(entity_df), chunk_size)
+        ]
+        logger.info(f"[FEAST] Caricamento in {len(chunks)} chunk da {chunk_size} righe ciascuno")
+
+        parts = []
+        for idx, chunk in enumerate(chunks, 1):
+            t_chunk = time.time()
+            logger.info(f"[FEAST] Chunk {idx}/{len(chunks)} — {len(chunk)} righe...")
+            part = self.store.get_historical_features(
+                entity_df=chunk,
+                features=self.store.get_feature_service(self.s.feature_service_name)
+            ).to_df()
+            parts.append(part)
+            logger.info(f"[FEAST] Chunk {idx}/{len(chunks)} completato in {time.time()-t_chunk:.2f}s — {len(part)} righe caricate")
+
+        training_df = pd.concat(parts, ignore_index=True)
+        del parts  # libera subito la memoria dei chunk intermedi
+
         logger.info(f"[FEAST] get_historical_features completato in {time.time()-t2:.2f}s")
         logger.info(f"[FEAST] Totale load_data: {time.time()-t0:.2f}s — {len(training_df)} righe caricate")
 
         return training_df
-
-"""    
-        def prepare_features(self, df, drop_cols):
-        
-        Prepara features per il modello.
-        Rimuove colonne non predittive (timestamp, ID, ecc.)
-        
-        Args:
-            df: DataFrame completo
-            drop_cols: Lista di colonne da escludere
-        
-        Returns:
-            x: DataFrame con sole features
-        
-        x = df.drop(columns=[c for c in drop_cols if c in df.columns])
-        logger.info(f"[DATA] Features prepared: {x.shape}")
-        return x"""
