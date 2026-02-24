@@ -11,8 +11,8 @@ import pandas as pd
 from confluent_kafka import Producer
 from config.config import Config
 
-BATCH_SIZE = 5
-BATCH_DELAY_SECONDS = 5
+BATCH_SIZE = 3
+BATCH_DELAY_SECONDS = 1
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("TelemetryProducer")
