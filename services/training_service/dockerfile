@@ -13,7 +13,8 @@ RUN mkdir -p ./data/raw \
             ./data/processed \
             ./models \
             ./metrics \
-            ./logs
+            ./logs \
+            /outputs
 
 ENV PYTHONPATH="/training_service:/training/src"
 ENV PATH="/training_service/.venv/bin:$PATH"

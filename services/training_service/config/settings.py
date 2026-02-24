@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     # ============================================================
     # DATA PROCESSING
     # ============================================================
-    output_dir: str = "outputs"                            # Directory to save JSON artifacts (history, thresholds)
+    output_dir: str = "/outputs"                           # Directory to save JSON artifacts (history, thresholds) — ABSOLUTE PATH matches Docker volume mount ./outputs:/outputs
     feast_chunk_size: int = 50_000      # righe per chunk Feast
     max_fit_rows: int = 200_000         # cap per il fit (subsample)
     inference_chunk_size: int = 50_000  # righe per chunk inference

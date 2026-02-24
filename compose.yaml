@@ -251,6 +251,7 @@ services:
       - ./services/feature_store_service/src:/training_service/feature_store_service/src:ro
       - ./data/registry:/data/registry
       - ./data/offline:/data/offline
+      - ./outputs:/outputs
     networks:
       - anomaly-detection-network
     restart: 'no'

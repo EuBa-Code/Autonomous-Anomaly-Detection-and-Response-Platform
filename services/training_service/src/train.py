@@ -40,6 +40,9 @@ def get_training_number(output_dir: str) -> int:
         return 1
 
 def save_training_metrics(output_dir: str, training_number: int, metrics: dict, thresholds: dict):
+    # Ensure output directory exists with proper error handling
+    os.makedirs(output_dir, exist_ok=True)
+    
     metrics_history_file = os.path.join(output_dir, "training_history.json")
     metrics_by_training_file = os.path.join(output_dir, f"metrics_training_{training_number}.json")
 
@@ -49,8 +52,6 @@ def save_training_metrics(output_dir: str, training_number: int, metrics: dict, 
         "metrics": metrics,
         "thresholds": thresholds
     }
-
-    os.makedirs(output_dir, exist_ok=True)
 
     with open(metrics_by_training_file, "w") as f:
         json.dump(training_data, f, indent=2)
