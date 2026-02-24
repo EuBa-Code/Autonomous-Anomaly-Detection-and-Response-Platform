@@ -85,16 +85,35 @@ def main():
     logger.info("[DATA] Caricamento dati...")
     dm = DataManager(s)
     df = dm.load_data()
+    
+    # Parse timestamp column
+    df = dm._parse_timestamp(df)
+
+    # Validate loaded data
+    if df.empty:
+        raise ValueError(
+            f"[DATA] ERRORE CRITICO: Dataset è vuoto! "
+            f"Verificare che il percorso offline store sia corretto: {s.offline_store_path}"
+        )
 
     logger.info("[DATA] Ordinamento temporale (senza split)...")
     ts = s.event_timestamp_column
+    
+    # Validate timestamp column exists
+    if ts not in df.columns:
+        raise KeyError(
+            f"[DATA] ERRORE: Colonna timestamp '{ts}' non trovata in dataset! "
+            f"Colonne disponibili: {df.columns.tolist()}"
+        )
+    
     df = df.sort_values(ts).reset_index(drop=True)
     logger.info(f"[DATA] Dataset totale: {len(df)} righe ordinate temporalmente")
 
-    drop_cols = [s.event_timestamp_column, "Machine_ID"]
+    drop_cols = [s.event_timestamp_column]  # Only drop timestamp (it's for ordering, not for training)
     x_train = df.drop(columns=[c for c in drop_cols if c in df.columns])
     del df  # libera memoria: df originale non più necessario
     logger.info(f"[DATA] Features selezionate: {x_train.shape[1]} colonne")
+    logger.info(f"[DATA] Colonne features: {x_train.columns.tolist()}")
 
     # 2. PIPELINE
     logger.info("[PIPELINE] Costruzione pipeline...")

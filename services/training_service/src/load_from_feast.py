@@ -1,78 +1,100 @@
 import pandas as pd
-from feast import FeatureStore
 import logging
 import time
+import os
+import glob
 
 logger = logging.getLogger(__name__)
 
 class DataManager:
     """
-    Responsible for loading data from Feast Feature Store.
-    Isolates data loading logic from the rest of the pipeline.
+    Simple data loader for offline store processed features.
+    Directly loads parquet files from the offline store directory.
+    No Feast integration needed - data is pre-processed.
     """
     def __init__(self, settings):
-        """Constructor: saves settings and initializes Feast client"""
+        """Constructor: saves settings"""
         self.s = settings
-        self.store = FeatureStore(repo_path=self.s.feast_repo_path)
         
     def load_data(self) -> pd.DataFrame:
         """
-        Carica i dati dal datalake ed esegue un point-in-time join con il Feast Offline Store.
-        Se l'offline store è vuoto, effettua una callback e ritorna solo i dati del datalake.
+        Load data from offline store directory.
+        
+        Handles three cases:
+        1. Single parquet file: /path/to/data.parquet
+        2. Directory with parquet: /path/to/dir/ (reads all .parquet files)
+        3. Spark output: /path/to/dir/ (reads all part-*.parquet files)
+        
+        Returns:
+            DataFrame with loaded data
         """
         t0 = time.time()
-        logger.info("[DATA] Lettura entity_df dal percorso Spark (Datalake)...")
+        path = self.s.offline_store_path
         
-        # 1. Load the full entity_df from the datalake
-        entity_df = pd.read_parquet(self.s.entity_df_path)
+        logger.info(f"[DATA] Caricamento dati da offline store: {path}")
         
-        # 2. Parse timestamp using the column name from settings, matching train.py logic
-        ts_col = getattr(self.s, "event_timestamp_column", "timestamp")
-        if ts_col in entity_df.columns:
-            # Converts the timestamp to datetime and removes the timezone
-            entity_df[ts_col] = pd.to_datetime(
-                entity_df[ts_col], utc=True
-            ).dt.tz_convert(None) 
+        # Case 1: Single parquet file
+        if path.endswith('.parquet') and os.path.isfile(path):
+            logger.info(f"[DATA] Lettura file singolo: {path}")
+            df = pd.read_parquet(path)
+            logger.info(f"[DATA] File caricato in {time.time()-t0:.2f}s — {len(df)} righe, {len(df.columns)} colonne")
+            return df
+        
+        # Case 2 & 3: Directory (with parquet files or Spark output)
+        if os.path.isdir(path):
+            logger.info(f"[DATA] Lettura directory: {path}")
             
-        logger.info(f"[DATA] entity_df letto in {time.time()-t0:.2f}s — {len(entity_df)} righe")
-
-        # 3. Feast Point-in-Time Join
-        logger.info(f"[FEAST] Avvio get_historical_features (Point-in-Time join) con {self.s.feature_service_name}...")
+            # Try to find parquet files
+            parquet_files = glob.glob(os.path.join(path, "**/*.parquet"), recursive=True)
+            
+            if not parquet_files:
+                raise FileNotFoundError(
+                    f"[DATA] ERRORE: Nessun file .parquet trovato in {path}\n"
+                    f"Cartelle disponibili: {os.listdir(path) if os.path.isdir(path) else 'N/A'}"
+                )
+            
+            logger.info(f"[DATA] Trovati {len(parquet_files)} file parquet")
+            
+            # Load all parquet files
+            dfs = []
+            for file in sorted(parquet_files):
+                logger.info(f"[DATA] Caricamento: {os.path.basename(file)}")
+                dfs.append(pd.read_parquet(file))
+            
+            # Concatenate all parts
+            df = pd.concat(dfs, ignore_index=True)
+            logger.info(f"[DATA] Directory caricata in {time.time()-t0:.2f}s — {len(df)} righe, {len(df.columns)} colonne")
+            return df
         
-        # Chunking per non saturare la RAM
-        chunk_size = getattr(self.s, "feast_chunk_size", 50_000)
-        chunks = [
-            entity_df.iloc[i : i + chunk_size]
-            for i in range(0, len(entity_df), chunk_size)
-        ]
-
-        parts = []
+        # Case 4: Path doesn't exist
+        raise FileNotFoundError(
+            f"[DATA] ERRORE CRITICO: Percorso non trovato: {path}\n"
+            f"Assicurati che il percorso sia corretto e che i dati siano disponibili."
+        )
+    
+    def _parse_timestamp(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Parse timestamp column to datetime.
+        
+        Args:
+            df: DataFrame to process
+            
+        Returns:
+            DataFrame with parsed timestamp column
+        """
+        ts_col = self.s.event_timestamp_column
+        
+        if ts_col not in df.columns:
+            logger.warning(
+                f"[DATA] Colonna timestamp '{ts_col}' NON trovata.\n"
+                f"Colonne disponibili: {df.columns.tolist()}"
+            )
+            return df
+        
         try:
-            # Get the feature service to read the feature schema
-            feature_service = self.store.get_feature_service(self.s.feature_service_name)
-            
-            for idx, chunk in enumerate(chunks, 1):
-                t_chunk = time.time()
-                
-                # Pass the FULL chunk (entity_df) to Feast
-                part = self.store.get_historical_features(
-                    entity_df=chunk,
-                    features=feature_service
-                ).to_df()
-                
-                # Check if Feast returned empty data (offline store is empty)
-                if part.empty:
-                    raise ValueError("Feast offline store returned an empty dataframe.")
-                    
-                parts.append(part)
-                logger.info(f"[FEAST] Chunk {idx}/{len(chunks)} completato in {time.time()-t_chunk:.2f}s")
-
-            training_df = pd.concat(parts, ignore_index=True)
-            logger.info(f"[FEAST] Join completato in {time.time()-t0:.2f}s")
-            return training_df
-
+            df[ts_col] = pd.to_datetime(df[ts_col], utc=True).dt.tz_localize(None)
+            logger.info(f"[DATA] Timestamp '{ts_col}' parsato correttamente")
         except Exception as e:
-            # 4. CALLBACK / FALLBACK: Offline store empty or unavailable
-            logger.warning(f"[FEAST] Errore o Offline Store vuoto: {e}")
-            logger.warning("[DATA] CALLBACK: Ritorno i dati esclusivi dal Datalake (entity_df).")
-            return entity_df
+            logger.warning(f"[DATA] Errore nel parsing timestamp: {e}")
+        
+        return df
