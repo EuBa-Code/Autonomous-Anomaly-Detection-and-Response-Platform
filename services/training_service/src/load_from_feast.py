@@ -72,7 +72,7 @@ class DataManager:
         Simple, no Feast complexity.
         """
         t0 = time.time()
-        logger.info("[DATA] Caricamento dati dal datalake (nessuna Feast join)...")
+        logger.info("[DATA] Loading data from the DataLake - No Feast Join ...")
         
         path = self.s.entity_df_path
         
