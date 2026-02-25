@@ -19,7 +19,7 @@ data_engineering_service/
 ## Quick Start
 
 ```bash
-# Run data engineering
+# Run data ing
 make data_engineering
 ```
 

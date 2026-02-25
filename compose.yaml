@@ -168,6 +168,35 @@ services:
     shm_size: '2gb'
     restart: "no"
 
+  batch_feature_pipeline:
+    build:
+      context: .
+      dockerfile: services/dockerfile.spark_services
+    container_name: batch_feature_pipeline
+    depends_on:
+      create_datasets:
+        condition: service_completed_successfully
+    # Chiamiamo il modulo partendo dalla radice /app
+    command: [ "-m", "batch_pipeline_service.src.batch_pipeline" ] 
+    environment:
+      - APP_HOME=/app
+      - PYTHONUNBUFFERED=1
+      - HISTORICAL_DIR=/app/data/historical_data
+      - OFFLINE_DIR=/app/data/offline
+      - SPARK_DRIVER_MEMORY=2g
+      # PYTHONPATH punta a /app così vede entrambi i pacchetti montati
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data
+      # 1. Montiamo il codice del servizio stesso
+      - ./services/batch_pipeline_service:/app/batch_pipeline_service
+      # 2. Montiamo SOLO il codice necessario dall'altro servizio
+      - ./services/data_engineering_service:/app/data_engineering_service
+    shm_size: '2gb'
+    networks:
+      - anomaly-detection-network
+    restart: "no"
+
   feature_loader:
     build:
       context: .
@@ -193,6 +222,9 @@ services:
     networks:
       - anomaly-detection-network
     restart: 'no'
+
+
+
 
   # ============================================================================
   # PRODUCER - Sends telemetry data to Redpanda
