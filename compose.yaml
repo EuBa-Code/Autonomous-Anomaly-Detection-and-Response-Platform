@@ -176,7 +176,6 @@ services:
     depends_on:
       create_datasets:
         condition: service_completed_successfully
-    # Chiamiamo il modulo partendo dalla radice /app
     command: [ "-m", "batch_pipeline_service.src.batch_pipeline" ] 
     environment:
       - APP_HOME=/app
@@ -184,13 +183,10 @@ services:
       - HISTORICAL_DIR=/app/data/historical_data
       - OFFLINE_DIR=/app/data/offline
       - SPARK_DRIVER_MEMORY=2g
-      # PYTHONPATH punta a /app così vede entrambi i pacchetti montati
       - PYTHONPATH=/app
     volumes:
       - ./data:/app/data
-      # 1. Montiamo il codice del servizio stesso
       - ./services/batch_pipeline_service:/app/batch_pipeline_service
-      # 2. Montiamo SOLO il codice necessario dall'altro servizio
       - ./services/data_engineering_service:/app/data_engineering_service
     shm_size: '2gb'
     networks:

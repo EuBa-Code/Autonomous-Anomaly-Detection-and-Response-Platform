@@ -1,384 +1,242 @@
 """
-Batch Feature Pipeline for Washing Machine Anomaly Detection
+Batch Feature Pipeline — Washing Machine Anomaly Detection
+==========================================================
 
-This script computes daily batch features for the Feast feature store:
-  • Daily_Vibration_PeakMean_Ratio: Daily max(Vibration) / mean(Vibration) per machine
-  
-The pipeline:
-  1. Loads configuration from YAML file
-  2. Reads processed industrial washer data from the data warehouse
-  3. Computes daily aggregations grouped by machine and calendar day
-  4. Joins aggregations back to each row (feature enrichment)
-  5. Writes results to offline store in Parquet format (Feast-compatible)
+Reads processed sensor data from the datalake and computes ONE row per machine
+containing the LAST complete daily window only.
 
-Architecture:
-  - Batch features have daily/weekly TTL (vs streaming features with hourly TTL)
-  - Separate feature view allows independent refresh cadences
-  - Both views share Machine_ID entity for unified feature retrieval at inference time
+Output schema (matches BATCH_SCHEMA / machine_batch_features FeatureView):
+  Machine_ID                    Int64
+  timestamp                     Timestamp UTC   ← latest event_timestamp in the window
+  Daily_Vibration_PeakMean_Ratio Float32
+
+Why "last window only"?
+  • The offline store is materialised daily; older windows are already stored.
+  • Writing only the latest window keeps the append fast and avoids re-computing
+    history that Feast already has.
+  • The `latest_window_per_entity` pattern (from job.py) picks exactly that window.
 """
 
 import os
-import yaml
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pyspark.sql import (
-    DataFrame,
-    SparkSession,
-    Window
-)
+from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
-# ============================================================================
-# LOGGING SETUP
-# ============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# LOGGING
+# ─────────────────────────────────────────────────────────────────────────────
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-# SETTINGS DATACLASS
-# ============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class Settings:
-    """Configuration for the batch feature pipeline"""
-    data_warehouse_dir: str  # Path to input data (processed industrial washer features)
-    offline_store_dir: str   # Path to output offline store (Feast-compatible)
-    spark_partitions: int    # Number of Spark partitions for parallelization
-    spark_master: str        # Spark master URL
-    spark_app_name: str      # Application name for Spark
-    timestamp_column: str    # Name of timestamp column
-    write_mode: str          # Write mode: 'overwrite', 'append', etc.
+    datalake_dir:    str   # Source: processed industrial washer features (full history)
+    offline_dir:     str   # Destination: Feast offline store directory
+    spark_partitions: int  # Output parquet file count
 
 
-def load_settings(config_path: str) -> Settings:
-    """
-    Load configuration from YAML file and create Settings dataclass
-    
-    Args:
-        config_path: Path to batch_config.yaml
-        
-    Returns:
-        Settings instance with all configuration loaded
-    """
-    logger.info(f"Loading configuration from {config_path}")
-    
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
-    
-    # Extract configurations with sensible defaults
-    paths = config.get('paths', {})
-    spark_cfg = config.get('spark', {})
-    schema = config.get('schema', {})
-    processing = config.get('processing', {})
-    
+def load_settings() -> Settings:
     return Settings(
-        data_warehouse_dir=paths.get('data_warehouse_dir', 'data/processed_datasets/industrial_washer_normal_features'),
-        offline_store_dir=paths.get('offline_store_dir', 'data/offline/machine_batch_features'),
-        spark_partitions=spark_cfg.get('partitions', 8),
-        spark_master=spark_cfg.get('master', 'local[*]'),
-        spark_app_name=spark_cfg.get('app_name', 'batch-feature-pipeline'),
-        timestamp_column=schema.get('timestamp_column', 'timestamp'),
-        write_mode=processing.get('write_mode', 'overwrite'),
+        datalake_dir=os.getenv(
+            "HISTORICAL_DIR",
+            "/app/data/processed_datasets/industrial_washer_normal_features",
+        ),
+        offline_dir=os.getenv(
+            "OFFLINE_DIR",
+            "/app/data/offline/machines_batch_features",
+        ),
+        spark_partitions=int(os.getenv("SPARK_PARTITIONS", "8")),
     )
 
 
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
 
 def _read_parquet(spark: SparkSession, path: Path) -> DataFrame:
-    """
-    Read Parquet file(s) from path
-    
-    Args:
-        spark: SparkSession instance
-        path: Path to parquet file or directory (supports PySpark partitioned structure)
-        
-    Returns:
-        Spark DataFrame
-        
-    Raises:
-        FileNotFoundError: If path does not exist
-    """
+    """Read parquet file(s) — raises immediately if path is missing."""
     if not path.exists():
-        raise FileNotFoundError(f"Input Parquet not found: {path}")
-    
+        raise FileNotFoundError(f"Input parquet not found: {path}")
     logger.info(f"Reading parquet from: {path}")
     df = spark.read.parquet(str(path))
-    logger.info(f"Loaded {df.count()} rows")
+    logger.info(f"  → {df.count()} rows loaded")
     return df
 
 
-def read_inputs(spark: SparkSession, data_warehouse_dir: str) -> DataFrame:
+def latest_window_per_entity(df: DataFrame, entity_col: str) -> DataFrame:
     """
-    Read processed industrial washer data from data warehouse
-    
-    Args:
-        spark: SparkSession instance
-        data_warehouse_dir: Path to processed features directory
-        
-    Returns:
-        Spark DataFrame with columns:
-          - Machine_ID
-          - timestamp
-          - Vibration_mm_s (and other sensor columns)
+    Given a DataFrame that already has a 'window' struct column (from F.window()),
+    return only the row belonging to the MOST RECENT window for each entity value.
+
+    Mirrors the pattern in job.py:
+        w = Window.partitionBy(entity_col).orderBy(F.col("window.end").desc())
+        row_number == 1  →  latest window only
     """
-    root = Path(data_warehouse_dir)
-    
-    # Read the main processed features parquet dataset
-    # Expected to have multiple part-*.parquet files in partitioned structure
-    df = _read_parquet(spark, root)
-    
-    logger.info(f"Schema of input data:")
-    df.printSchema()
-    
-    return df
+    w = Window.partitionBy(entity_col).orderBy(F.col("window.end").desc())
+    return (
+        df.withColumn("_rn", F.row_number().over(w))
+          .filter(F.col("_rn") == 1)
+          .drop("_rn")
+    )
 
 
-def compute_daily_batch_features(df: DataFrame, timestamp_col: str) -> DataFrame:
+# ─────────────────────────────────────────────────────────────────────────────
+# PIPELINE STEPS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def read_inputs(spark: SparkSession, datalake_dir: str) -> DataFrame:
     """
-    Compute daily batch features grouped by Machine_ID and calendar day
-    
-    Formula: Daily_Vibration_PeakMean_Ratio = max(Vibration_mm_s) / mean(Vibration_mm_s)
-    
-    Interpretation:
-      - High ratio: spiky/impulsive vibration → potential mechanical fault
-      - Low ratio: smooth vibration → healthy operation
-      
-    Implementation approach (matching data_engineering.py):
-      1. Create daily window using F.window("timestamp", "1 day")
-      2. Group by Machine_ID and window period
-      3. Compute max/mean aggregation
-      4. Join result back to every row within that day (enrichment)
-      5. Null out values for incomplete first period per machine
-    
-    Args:
-        df: Input DataFrame with timestamp and Vibration_mm_s columns
-        timestamp_col: Name of timestamp column
-        
-    Returns:
-        DataFrame with original columns + Daily_Vibration_PeakMean_Ratio
+    Read the full processed feature dataset from the datalake.
+
+    Expected columns (subset used here):
+      Machine_ID      Int64
+      timestamp       Timestamp UTC
+      Vibration_mm_s  Float32   ← the only sensor column needed for this feature
     """
-    logger.info("Computing daily batch features")
-    
-    # Cast timestamp to ensure it's in proper format for windowing
+    return _read_parquet(spark, Path(datalake_dir))
+
+
+def compute_last_daily_window(df: DataFrame, timestamp_col: str = "timestamp") -> DataFrame:
+    """
+    Compute Daily_Vibration_PeakMean_Ratio for the LAST complete daily window
+    per machine.
+
+    Steps
+    ─────
+    1. Ensure timestamp column is properly cast.
+    2. Group by (Machine_ID, 1-day tumbling window) and aggregate:
+         Daily_Vibration_PeakMean_Ratio = max(Vibration_mm_s) / mean(Vibration_mm_s)
+         timestamp = max(timestamp) in that window   ← Feast needs a timestamp field
+    3. Call latest_window_per_entity() to keep ONLY the most recent daily window
+       per Machine_ID.
+    4. Drop the 'window' struct — it is an internal Spark column not in BATCH_SCHEMA.
+
+    Output columns:
+      Machine_ID                     Int64
+      timestamp                      Timestamp UTC
+      Daily_Vibration_PeakMean_Ratio Float32
+    """
+    logger.info("Step 1 — casting timestamp column...")
     df = df.withColumn(timestamp_col, F.col(timestamp_col).cast("timestamp"))
-    
-    # Step 1: Create daily tumbling window
-    # Groups each row into the start of the day it belongs to
-    # Example: 2024-01-15 06:30:45 → 2024-01-15 00:00:00 (window start)
-    logger.info("Creating daily window aggregation...")
-    
-    daily_window = (
+
+    # ── Step 2: daily tumbling window aggregation ─────────────────────────────
+    logger.info("Step 2 — aggregating into 1-day tumbling windows per Machine_ID...")
+    daily_windows = (
         df.groupBy(
             F.col("Machine_ID"),
-            F.window(timestamp_col, "1 day").alias("window")
+            F.window(timestamp_col, "1 day").alias("window"),   # struct: {start, end}
         )
         .agg(
-            # Daily peak-to-mean ratio: max(Vibration) / mean(Vibration)
+            # Peak-to-mean vibration ratio: high value → impulsive/spiky behaviour
             (F.max("Vibration_mm_s") / F.mean("Vibration_mm_s"))
-            .alias("Daily_Vibration_PeakMean_Ratio"),
-            
-            # Keep track of the latest timestamp in each window (for Feast FileSource requirement)
+                .cast("float")
+                .alias("Daily_Vibration_PeakMean_Ratio"),
+
+            # Keep the latest raw timestamp inside this window so Feast can use it
+            # as the event_timestamp for point-in-time joins.
             F.max(timestamp_col).alias(timestamp_col),
         )
     )
-    
-    logger.info("Daily aggregation computed")
-    
-    # Step 2: For each machine, identify the latest (most recent) daily window
-    # This is needed because we only care about the current day's aggregation value
-    # to join back to rows
-    logger.info("Selecting latest daily window per machine...")
-    
-    w = Window.partitionBy("Machine_ID").orderBy(F.col("window.end").desc())
-    daily_latest = (
-        daily_window
-        .withColumn("rn", F.row_number().over(w))
-        .filter(F.col("rn") == 1)
-        .drop("rn")
-        .select(
-            "Machine_ID",
-            "Daily_Vibration_PeakMean_Ratio",
-            timestamp_col
-        )
+
+    # ── Step 3: keep only the LAST window per machine ─────────────────────────
+    logger.info("Step 3 — selecting latest daily window per Machine_ID...")
+    latest = latest_window_per_entity(daily_windows, "Machine_ID")
+
+    # ── Step 4: clean up — drop the Spark window struct ──────────────────────
+    result = latest.select(
+        F.col("Machine_ID"),
+        F.col(timestamp_col),
+        F.col("Daily_Vibration_PeakMean_Ratio"),
     )
-    
-    # Step 3: Join daily aggregation back to each row
-    # This enriches every row with the daily aggregate for its machine+day
-    logger.info("Joining daily features back to original data...")
-    
-    # For proper joining, we need to align timestamps to day boundaries
-    df_with_daily = (
-        df
-        .withColumn("_day", F.date_trunc("day", F.col(timestamp_col)))
-        .join(
-            daily_window
-            .withColumn("_day", F.date_trunc("day", F.col("window.end"))),
-            on=["Machine_ID", "_day"],
-            how="left"
-        )
-        .drop("_day", "window")
-    )
-    
-    logger.info("Daily features joined successfully")
-    
-    # Step 4: Handle incomplete periods
-    # The first incomplete period per machine (e.g., if data starts at 06:00)
-    # should have NULL for daily features since aggregation is incomplete
-    # This prevents misleading feature values based on partial day data
-    logger.info("Applying first-period guard (nulling incomplete initial period)...")
-    
-    _FIRST_PERIOD_COL = "_batch_first_period_"
-    machine_window = Window.partitionBy("Machine_ID")
-    
-    df_with_daily = (
-        df_with_daily
-        .withColumn(
-            "_day_period",
-            F.date_trunc("day", F.col(timestamp_col))
-        )
-        .withColumn(
-            _FIRST_PERIOD_COL,
-            F.min("_day_period").over(machine_window)
-        )
-        .withColumn(
-            "Daily_Vibration_PeakMean_Ratio",
-            F.when(
-                F.col("_day_period") == F.col(_FIRST_PERIOD_COL),
-                F.lit(None).cast("double")  # First period → null
-            ).otherwise(F.col("Daily_Vibration_PeakMean_Ratio"))  # Others → keep value
-        )
-        .drop("_day_period", _FIRST_PERIOD_COL)
-    )
-    
-    logger.info("✓ Batch feature computation complete")
-    
-    return df_with_daily
+
+    logger.info("  → Daily batch features computed for last window only")
+    return result
 
 
-def write_offline(df: DataFrame, out_path: Path, partitions: int, write_mode: str) -> None:
+def write_offline(df: DataFrame, out_path: Path, partitions: int) -> None:
     """
-    Write feature DataFrame to offline store in Parquet format
-    
-    Output format: Multiple part-*.parquet files (PySpark partitioned structure)
-    This matches Feast's FileSource expectations
-    
-    Args:
-        df: DataFrame to write
-        out_path: Output directory path
-        partitions: Number of output partitions (files)
-        write_mode: Spark write mode ('overwrite', 'append', etc.)
+    Write feature rows to the Feast offline store (partitioned parquet directory).
+
+    Write mode is 'append' so that previous days' windows are preserved in the
+    directory and Feast can serve point-in-time lookups over the full history.
     """
-    logger.info(f"Writing offline features to: {out_path}")
-    logger.info(f"Write mode: {write_mode}")
-    logger.info(f"Repartitioning to {partitions} output files")
-    
     out_path.mkdir(parents=True, exist_ok=True)
-    
-    # Repartition for even distribution across output files
-    # Then write in Parquet format
+    logger.info(f"Writing to offline store: {out_path}  (partitions={partitions})")
     (
-        df
-        .repartition(partitions)
-        .write
-        .mode(write_mode)
-        .parquet(str(out_path))
+        df.repartition(partitions)
+          .write
+          .mode("append")            # append: daily incremental, no history overwrite
+          .parquet(str(out_path))
     )
-    
-    logger.info(f"✓ Data written successfully to {out_path}")
+    logger.info("  → Written successfully")
 
 
-# ============================================================================
-# MAIN PIPELINE
-# ============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    """Main orchestration function for batch feature pipeline"""
-    
-    logger.info("=" * 80)
-    logger.info("BATCH FEATURE PIPELINE - WASHING MACHINE ANOMALY DETECTION")
-    logger.info("=" * 80)
-    
-    # 1. Load configuration
-    config_path = "batch_config.yaml"
-    if not Path(config_path).exists():
-        logger.error(f"Configuration file not found: {config_path}")
-        logger.error("Please create batch_config.yaml in the current directory")
-        return
-    
-    settings = load_settings(config_path)
-    logger.info(f"Configuration loaded: {config_path}")
-    
-    # 2. Initialize Spark session
-    logger.info("Initializing Spark session...")
+    logger.info("=" * 70)
+    logger.info("BATCH FEATURE PIPELINE  —  last daily window per machine")
+    logger.info("=" * 70)
+
+    s = load_settings()
+
+    # 1. Spark session
     spark = (
         SparkSession.builder
-        .appName(settings.spark_app_name)
-        .master(settings.spark_master)
+        .appName("batch-feature-pipeline-washing-machines")
+        .master("local[*]")
         .config("spark.sql.session.timeZone", "UTC")
-        .config("spark.sql.shuffle.partitions", str(max(8, settings.spark_partitions * 2)))
+        .config("spark.sql.shuffle.partitions", str(max(8, s.spark_partitions * 2)))
         .getOrCreate()
     )
-    
     spark.sparkContext.setLogLevel("WARN")
-    logger.info("Spark session initialized")
-    
+    logger.info("Spark session ready")
+
     try:
-        # 3. Read input data from data warehouse
-        logger.info("Reading input data from data warehouse...")
-        df = read_inputs(spark, settings.data_warehouse_dir)
-        
-        # 4. Compute daily batch features
-        logger.info("Computing daily batch features...")
-        df_with_features = compute_daily_batch_features(df, settings.timestamp_column)
-        
-        # 5. Show sample output for verification
-        logger.info("Sample output (first 10 rows):")
-        df_with_features.select(
-            "Machine_ID",
-            settings.timestamp_column,
-            "Vibration_mm_s",
-            "Daily_Vibration_PeakMean_Ratio"
-        ).show(10, truncate=False)
-        
-        # 6. Write to offline store
-        offline_path = Path(settings.offline_store_dir)
-        write_offline(
-            df_with_features,
-            offline_path,
-            settings.spark_partitions,
-            settings.write_mode
-        )
-        
-        # 7. Print summary
-        logger.info("=" * 80)
-        logger.info("BATCH PIPELINE COMPLETED SUCCESSFULLY")
-        logger.info("=" * 80)
-        logger.info(f"Output location: {offline_path}")
-        logger.info(f"Features computed: Daily_Vibration_PeakMean_Ratio")
-        
-        # Suggested timestamp for Feast materialize-incremental command
-        end_date = datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat()
-        logger.info(f"Suggested end-date for 'feast materialize-incremental' (UTC): {end_date}")
-        
-    except Exception as e:
-        logger.error(f"Pipeline failed: {str(e)}", exc_info=True)
+        # 2. Read full datalake (all machines, all time)
+        df = read_inputs(spark, s.datalake_dir)
+
+        # 3. Compute feature for the last daily window only
+        batch_features = compute_last_daily_window(df, timestamp_col="timestamp")
+
+        # 4. Preview
+        logger.info("Sample output:")
+        batch_features.show(10, truncate=False)
+
+        # 5. Append to offline store
+        write_offline(batch_features, Path(s.offline_dir), s.spark_partitions)
+
+        # 6. Summary
+        end_ts = datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat()
+        logger.info("=" * 70)
+        logger.info("PIPELINE COMPLETE")
+        logger.info(f"  Offline store : {s.offline_dir}")
+        logger.info(f"  Feature       : Daily_Vibration_PeakMean_Ratio")
+        logger.info(f"  Suggested end-date for feast materialize-incremental: {end_ts}")
+        logger.info("=" * 70)
+
+    except Exception as exc:
+        logger.error(f"Pipeline failed: {exc}", exc_info=True)
         raise
-    
+
     finally:
-        # 8. Clean up
-        logger.info("Stopping Spark session...")
         spark.stop()
-        logger.info("Pipeline finished")
+        logger.info("Spark session stopped")
 
 
 if __name__ == "__main__":
