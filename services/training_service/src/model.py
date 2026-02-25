@@ -6,48 +6,49 @@ from sklearn.ensemble import IsolationForest
 
 class ModelFactory:
     """
-    Factory pattern: metodo statico che assembla una Pipeline
-    complessa con preprocessing + modello.
+    Factory method (static):
+    constructs a composite Pipeline consisting of 
+    preprocessing steps and a model.
     """
     @staticmethod
     def build_pipeline(num_cols, cat_cols, settings): # cat_cols = Cycle_Phase_ID
         """
-        Costruisce Pipeline sklearn con:
-        - ColumnTransformer (preprocessing parallelo per num/cat)
+        sklearn Pipeline builder composed of:
+        - ColumnTransformer (parallel preprocessing for numerical and categorical columns)
         - IsolationForest (anomaly detector)
         
         Args:
-            num_cols: lista colonne numeriche
-            cat_cols: lista colonne categoriche (Cycle_Phase_ID)
-            settings: oggetto Settings con iperparametri
+            num_cols: numerical columns list
+            cat_cols: categorical columns list (Cycle_Phase_ID)
+            settings: Settings Object containing iperparameters
         
         Returns:
-            Pipeline oggetto sklearn
+            sklearn Pipeline instance
         """
-        pre = ColumnTransformer(                                # Trasforma in parallelo colonne numeriche e categoriche
+        pre = ColumnTransformer(                                # Apply parallel transformations to numerical and categorical columns.
             transformers=[
                 ("num", Pipeline([
-                    ("imp", SimpleImputer(strategy="median")),  # Imputazione con mediana per numeriche (robusta agli outlier)
-                    ("scaler", StandardScaler())                # Standardizzazione (mean=0, std=1) per numeriche
+                    ("imp", SimpleImputer(strategy="median")),  # Median imputation for numerical features (robust to outliers)
+                    ("scaler", StandardScaler())                # Standardization (mean=0, std=1) for numerical features
                 ]), num_cols),                                  
                 ("cat", Pipeline([
-                    ("imp", SimpleImputer(strategy="constant", fill_value="missing")), # Imputazione con "missing" per categoriche
-                    ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False)), # One-Hot Encoding per categoriche, ignora categorie non viste in training
+                    ("imp", SimpleImputer(strategy="constant", fill_value="missing")), # Impute categorical features with the "missing" placeholder
+                    ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False)), # One-Hot Encoding for categorical columns, ignore categories not seen during training
                 ]), cat_cols),
             ],
-            remainder="drop",                           # Drop altre colonne non specificate (es. timestamp, ID)
-            verbose_feature_names_out=False,            # Nomi output più puliti (es. "num__feature1" → "feature1")
+            remainder="drop",                           # Drop other unspecified columns (e.g., timestamp, ID)
+            verbose_feature_names_out=False,            # Rename output columns to simplified feature names (es. "num__feature1" → "feature1")
         )
 
         model = IsolationForest(
-            n_estimators=settings.training.if_n_estimators, # Numero di alberi nell'ensemble (default 100)
-            contamination=settings.training.contamination,  # Percentuale di anomalie attese (default 0.1 = 10%)
-            random_state=settings.training.random_state,    # Seed per riproducibilità (default 42)
-            n_jobs=-1,                                  # Usa tutti i core disponibili per velocizzare il training                                      
+            n_estimators=settings.training.if_n_estimators, # Number of trees in the ensemble (default 100)
+            contamination=settings.training.contamination,  # Expected anomaly rate (default 0.1 = 10%)
+            random_state=settings.training.random_state,    # Seed for reproducibility (default 42)
+            n_jobs=-1,                                      # Use all available CPU cores to speed up training                                     
         )
 
-        return Pipeline([("pre", pre),                  # Preprocessing come primo step
-                         ("model", model)])             # Isolation Forest come secondo step
+        return Pipeline([("pre", pre),                  # First step:   Preprocessing
+                         ("model", model)])             # Second step:  Isolation Forest
     
         # Workflow:
         #   pipe.fit(X) → pre.fit_transform(X) + model.fit(X_pre)
