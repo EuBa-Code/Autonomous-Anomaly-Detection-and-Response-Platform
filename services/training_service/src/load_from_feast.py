@@ -78,33 +78,33 @@ class DataManager:
         
         # Case 1: Single parquet file
         if path.endswith('.parquet') and os.path.isfile(path):
-            logger.info(f"[DATA] Lettura file singolo: {path}")
+            logger.info(f"[DATA] Reading Single Parquet: {path}")
             df = pd.read_parquet(path)
-            logger.info(f"[DATA] File caricato in {time.time()-t0:.2f}s — {len(df)} righe")
+            logger.info(f"[DATA] File uploaded to {time.time()-t0:.2f}s — {len(df)} righe")
             return df
         
         # Case 2: Directory with parquet files
         if os.path.isdir(path):
-            logger.info(f"[DATA] Lettura directory: {path}")
+            logger.info(f"[DATA] Reading Directory: {path}")
             parquet_files = glob.glob(os.path.join(path, "**/*.parquet"), recursive=True)
             
             if not parquet_files:
                 raise FileNotFoundError(
-                    f"[DATA] ERRORE: Nessun file .parquet trovato in {path}"
+                    f"[DATA] ERROR: No .parquet file found in {path}"
                 )
             
-            logger.info(f"[DATA] Trovati {len(parquet_files)} file parquet")
+            logger.info(f"[DATA] Found {len(parquet_files)} parquet files")
             dfs = []
             for file in sorted(parquet_files):
-                logger.info(f"[DATA] Caricamento: {os.path.basename(file)}")
+                logger.info(f"[DATA] Loading: {os.path.basename(file)}")
                 dfs.append(pd.read_parquet(file))
             
             df = pd.concat(dfs, ignore_index=True)
-            logger.info(f"[DATA] Directory caricata in {time.time()-t0:.2f}s — {len(df)} righe")
+            logger.info(f"[DATA] Directory uploaded to {time.time()-t0:.2f}s — {len(df)} righe")
             return df
         
         raise FileNotFoundError(
-            f"[DATA] ERRORE: Percorso non trovato: {path}"
+            f"[DATA] ERRORE: PATH NOT FOUND: {path}"
         )
     
     def _load_phase2_datalake_with_feast(self) -> pd.DataFrame:
@@ -113,11 +113,11 @@ class DataManager:
         Uses point-in-time join for accurate feature values.
         """
         t0 = time.time()
-        logger.info("[DATA] Caricamento entity_df dal datalake...")
+        logger.info("[DATA] Loading entity_df from DataLake...")
         
         # 1. Load entity_df from datalake
         entity_df = pd.read_parquet(self.s.entity_df_path)
-        logger.info(f"[DATA] entity_df caricato: {len(entity_df)} righe")
+        logger.info(f"[DATA] Loaded entity_df: {len(entity_df)} rows")
         
         # 2. Parse timestamp
         ts_col = self.s.event_timestamp_column
@@ -125,16 +125,16 @@ class DataManager:
             entity_df[ts_col] = pd.to_datetime(
                 entity_df[ts_col], utc=True
             ).dt.tz_localize(None)
-            logger.info(f"[DATA] Timestamp '{ts_col}' parsato")
+            logger.info(f"[DATA] Parsed '{ts_col}' Timestamp")
         else:
-            logger.warning(f"[DATA] Colonna timestamp '{ts_col}' non trovata")
+            logger.warning(f"[DATA] Timestamp Column '{ts_col}' not found")
         
         if entity_df.empty:
-            logger.warning("[DATA] entity_df è vuoto!")
+            logger.warning("[DATA] entity_df IS EMPTY!")
             return entity_df
         
         # 3. Feast Point-in-Time Join
-        logger.info(f"[FEAST] Avvio get_historical_features con {self.s.feature_service_name}...")
+        logger.info(f"[FEAST] Starting get_historical_features with {self.s.feature_service_name}...")
         
         if self.store is None:
             logger.warning("[FEAST] Feast store not initialized, returning datalake data only")
@@ -161,13 +161,13 @@ class DataManager:
                     raise ValueError("Feast offline store returned empty dataframe")
                 
                 parts.append(part)
-                logger.info(f"[FEAST] Chunk {idx}/{len(chunks)} completato in {time.time()-t_chunk:.2f}s")
+                logger.info(f"[FEAST] Chunk {idx}/{len(chunks)} completed in {time.time()-t_chunk:.2f}s")
             
             training_df = pd.concat(parts, ignore_index=True)
-            logger.info(f"[FEAST] Join completato in {time.time()-t0:.2f}s — {len(training_df)} righe")
+            logger.info(f"[FEAST] Join completed in {time.time()-t0:.2f}s — {len(training_df)} rows")
             return training_df
         
         except Exception as e:
-            logger.warning(f"[FEAST] Errore nella Feast join: {e}")
-            logger.warning("[DATA] FALLBACK: Ritornando solo datalake data")
+            logger.warning(f"[FEAST] ERROR: Feast Join failure: {e}")
+            logger.warning("[DATA] FALLBACK: Returning only datalake data")
             return entity_df
