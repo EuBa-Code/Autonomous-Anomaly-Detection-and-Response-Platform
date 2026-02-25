@@ -11,7 +11,7 @@ from feast import FeatureStore
 from confluent_kafka import Producer
 import uvicorn
 import time
-from config.config import Config
+from config import Config
 
 # Logging Setup
 logging.basicConfig(
