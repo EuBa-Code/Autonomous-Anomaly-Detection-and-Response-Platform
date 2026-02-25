@@ -1,340 +1,358 @@
-# Batch Pipeline Improvements - Detailed Analysis
+# Batch Feature Pipeline for Washing Machine Anomaly Detection
 
-## Key Changes Made (Based on `job.py` Best Practices)
+## Overview
 
-### 1. **Settings as Dataclass (Instead of Static Config Class)**
+This batch pipeline computes **daily batch features** for the Feast feature store, specifically for washing machine anomaly detection. The pipeline is built with PySpark and follows the architecture established in your feature store configuration.
 
-**Before (batch_pipeline.py):**
-```python
-class Config:
-    SPARK_APP_NAME = "WashingMachine-Batch-Append-Clean"
-    HISTORICAL_DIR = os.getenv("HISTORICAL_DIR", "/app/data/historical_data")
-    # ... many static attributes
+## Architecture
+
+### Feature Separation Strategy
+
+The system uses **two separate feature views** with different cadences:
+
+```
+┌─────────────────────────────────┐      ┌──────────────────────────────────┐
+│  machine_streaming_features     │      │  machine_batch_features          │
+│  (hourly/real-time updates)     │      │  (daily computation)             │
+│                                 │      │                                  │
+│  - Raw sensor readings          │      │  - Daily_Vibration_PeakMean_Ratio│
+│  - Rolling-window features      │      │    (max/mean ratio per day)      │
+│    (5min, 10min windows)        │      │                                  │
+│  TTL: 12 hours                  │      │  TTL: 7 days                     │
+└─────────────────────────────────┘      └──────────────────────────────────┘
 ```
 
-**After (batch_pipeline_improved.py):**
-```python
-@dataclass(frozen=True)
-class Settings:
-    historical_dir: str
-    offline_dir: str
-    feature_config_path: str
-    # ... typed fields with validation
-    
-def load_settings() -> Settings:
-    return Settings(
-        historical_dir=os.getenv("HISTORICAL_DIR", "/app/data/historical_data"),
-        # ...
-    )
+**Why separate?**
+- **Different refresh rates**: Streaming updates every few seconds; batch runs once per day
+- **Independent TTLs**: Prevents evicting fresh streaming data while waiting for batch
+- **Clear ownership**: Data engineers own batch features; streaming team owns real-time features
+- **Scalability**: Batch pipelines can be optimized for historical data; streaming for latency
+
+### Computed Feature
+
+**`Daily_Vibration_PeakMean_Ratio`**
+
+```
+Formula: max(Vibration_mm_s) / mean(Vibration_mm_s)  [per machine, per day]
+
+Interpretation:
+  • High ratio (>1.5):   Spiky, impulsive vibration → potential mechanical fault
+  • Normal ratio (1.0-1.5): Smooth operation → healthy machine
+  • Low ratio (<1.0):    Shouldn't happen (max must be ≥ mean)
 ```
 
-**Why:** 
-- Type hints provide better IDE support and catch errors early
-- `frozen=True` prevents accidental mutations
-- Follows the pattern successfully used in `job.py`
-- More explicit and testable
+This feature captures **short-term shock events** relative to baseline vibration, which is a strong early indicator of bearing degradation or winding faults.
 
----
+## File Structure
 
-### 2. **Helper Functions for Common Operations**
-
-**Before:**
-```python
-raw_df = spark.read.parquet(f"{Config.HISTORICAL_DIR}/*.parquet")
-# No validation, errors silently fail
+```
+your_project/
+├── batch_job.py                    # Main batch pipeline script
+├── batch_config.yaml               # Configuration file (paths, Spark settings)
+├── README.md                       # This file
+└── requirements.txt                # Python dependencies
 ```
 
-**After:**
-```python
-def _read_parquet(spark: SparkSession, path: Path) -> DataFrame:
-    if not path.exists():
-        raise FileNotFoundError(f"Input parquet not found: {path}")
-    print(f"[*] Reading parquet from: {path}")
-    df = spark.read.parquet(str(path))
-    row_count = df.count()
-    print(f"[*] Loaded {row_count} rows")
-    return df
+## Installation
 
-raw_df = _read_parquet(spark, Path(settings.historical_dir))
+### Prerequisites
+
+- Python 3.8+
+- PySpark 3.3+
+- PyYAML
+
+### Setup
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Or install individually
+pip install pyspark==3.3.2
+pip install pyyaml
 ```
 
-**Why:**
-- Consistent error handling
-- Better observability with logging
-- Reusable across multiple jobs
-- Matches pattern from `job.py` (see `_read_parquet()` function)
+## Configuration
 
----
+The pipeline is configured via `batch_config.yaml`. Key sections:
 
-### 3. **Enhanced Validation Function**
+### `paths`
+```yaml
+paths:
+  data_warehouse_dir: "data/processed_datasets/industrial_washer_normal_features"
+  offline_store_dir: "data/offline/machine_batch_features"
+```
+- **data_warehouse_dir**: Source of processed/enriched industrial washer data (output from your data engineering pipeline)
+- **offline_store_dir**: Target directory for Feast offline store (must match `data_sources.py` path)
 
-**Before (config.py):**
-```python
-@classmethod
-def validate(cls) -> bool:
-    try:
-        if not Path(cls.HISTORICAL_DIR).exists():
-            print(f"[!] Warning: HISTORICAL_DIR does not exist: {cls.HISTORICAL_DIR}")
-        return True  # Returns True even if path doesn't exist!
-    except Exception as e:
-        print(f"[!] Configuration validation error: {e}")
-        return False
+### `spark`
+```yaml
+spark:
+  app_name: "batch-feature-pipeline-washing-machines"
+  master: "local[*]"                    # "local[*]" for single machine
+  partitions: 8                         # Number of output files
+  configs:
+    "spark.sql.session.timeZone": "UTC"
 ```
 
-**After:**
-```python
-def validate_settings(settings: Settings) -> bool:
-    historical_path = Path(settings.historical_dir)
-    
-    if not historical_path.exists():
-        print(f"[!] Warning: HISTORICAL_DIR does not exist: {historical_path}")
-        return False
-    
-    if not historical_path.is_dir():
-        print(f"[!] Error: HISTORICAL_DIR is not a directory: {historical_path}")
-        return False
-    
-    parquet_files = list(historical_path.glob("*.parquet"))
-    if not parquet_files:
-        print(f"[!] Warning: No parquet files found in: {historical_path}")
-        return False
-    
-    print(f"[✓] Validation passed. Found {len(parquet_files)} parquet files")
-    return True
+### `batch_features`
+```yaml
+batch_features:
+  daily_vibration_ratio:
+    enabled: true
+    feature_name: "Daily_Vibration_PeakMean_Ratio"
+    source_column: "Vibration_mm_s"
+    aggregation_type: "daily"
 ```
 
-**Why:**
-- Proper validation (doesn't return True on missing directory)
-- Checks for actual parquet files
-- More informative feedback
-- Prevents silent failures
+## Usage
 
----
+### Basic Run
 
-### 4. **Modular Functions with Single Responsibility**
-
-**Before:**
-```python
-def run_batch_pipeline():
-    # All logic in one 60+ line function
-    # Mix of validation, Spark setup, data loading, transformations, writing
+```bash
+python batch_job.py
 ```
 
-**After:**
-```python
-def apply_feature_engineering(raw_df: DataFrame, settings: Settings) -> DataFrame:
-    """Apply feature engineering transformations to raw data."""
-    
-def clean_and_prepare_features(enriched_df: DataFrame, settings: Settings) -> DataFrame:
-    """Clean schema, handle nulls, remove duplicates."""
-    
-def write_offline(df: DataFrame, output_path: Path, write_mode: str, num_partitions: int) -> None:
-    """Write DataFrame to offline feature store (parquet format)."""
+The script expects `batch_config.yaml` in the current directory.
 
-def run_batch_pipeline() -> None:
-    # Now orchestrates smaller, focused functions
+### Custom Config Path
+
+If your config is elsewhere:
+
+```bash
+# Modify the config_path in main() function
+config_path = "/path/to/your/batch_config.yaml"
 ```
 
-**Why:**
-- Each function has a clear, single responsibility
-- Easier to unit test individual steps
-- More readable and maintainable
-- Reusable components
-- Matches structure of `job.py` functions
-
----
-
-### 5. **Better Path Handling**
-
-**Before:**
-```python
-raw_df = spark.read.parquet(f"{Config.HISTORICAL_DIR}/*.parquet")
-# String concatenation, no validation
+Then run:
+```bash
+python batch_job.py
 ```
 
-**After:**
-```python
-historical_path = Path(settings.historical_dir)
-raw_df = _read_parquet(spark, historical_path)
-# Type-safe, validated, platform-independent paths
+### Example Output
+
+```
+2024-01-15 10:30:45,123 - __main__ - INFO - ================================================================================
+2024-01-15 10:30:45,124 - __main__ - INFO - BATCH FEATURE PIPELINE - WASHING MACHINE ANOMALY DETECTION
+2024-01-15 10:30:45,125 - __main__ - INFO - ================================================================================
+2024-01-15 10:30:45,200 - __main__ - INFO - Loading configuration from batch_config.yaml
+2024-01-15 10:30:45,300 - __main__ - INFO - Initializing Spark session...
+2024-01-15 10:30:50,500 - __main__ - INFO - Spark session initialized
+2024-01-15 10:30:50,510 - __main__ - INFO - Reading input data from data warehouse...
+2024-01-15 10:30:52,123 - __main__ - INFO - Loaded 450000 rows
+2024-01-15 10:30:52,200 - __main__ - INFO - Computing daily batch features...
+2024-01-15 10:30:58,456 - __main__ - INFO - Sample output (first 10 rows):
++-----------+-------------------+------------------+------------------------------+
+|Machine_ID |timestamp          |Vibration_mm_s    |Daily_Vibration_PeakMean_Ratio|
++-----------+-------------------+------------------+------------------------------+
+|1          |2024-01-15 06:15:30|3.456             |1.234                         |
+|1          |2024-01-15 06:20:45|2.987             |1.234                         |
+|2          |2024-01-15 07:05:12|5.123             |1.678                         |
+...
+2024-01-15 10:31:02,789 - __main__ - INFO - Writing offline features to: data/offline/machine_batch_features
+2024-01-15 10:31:05,456 - __main__ - INFO - ✓ Data written successfully
+2024-01-15 10:31:05,500 - __main__ - INFO - ================================================================================
+2024-01-15 10:31:05,501 - __main__ - INFO - BATCH PIPELINE COMPLETED SUCCESSFULLY
+2024-01-15 10:31:05,502 - __main__ - INFO - Output location: data/offline/machine_batch_features
+2024-01-15 10:31:05,503 - __main__ - INFO - Features computed: Daily_Vibration_PeakMean_Ratio
+2024-01-15 10:31:05,504 - __main__ - INFO - Suggested end-date for 'feast materialize-incremental' (UTC): 2024-01-15T10:31:05Z
 ```
 
-**Why:**
-- `Path` objects are platform-independent (handles Windows/Unix paths)
-- Type safety
-- Consistent with `job.py` approach
-- Easier to manipulate paths
+## Integration with Feast
 
----
+### Step 1: Run Batch Pipeline
 
-### 6. **Proper Documentation with Docstrings**
-
-**Before:**
-```python
-def run_batch_pipeline():
-    """
-    Main batch pipeline for washing machine feature engineering.
-    
-    Workflow:
-    1. Load raw data from historical data lake
-    ...
-    """
+```bash
+python batch_job.py
 ```
 
-**After:**
-```python
-def _read_parquet(spark: SparkSession, path: Path) -> DataFrame:
-    """
-    Read parquet file(s) into a Spark DataFrame with proper error handling.
-    
-    Args:
-        spark: SparkSession instance
-        path: Path to parquet file or directory
-        
-    Returns:
-        DataFrame: Loaded parquet data
-        
-    Raises:
-        FileNotFoundError: If parquet path does not exist
-    """
+This writes to `data/offline/machine_batch_features/part-*.parquet`
 
-def clean_and_prepare_features(
-    enriched_df: DataFrame,
-    settings: Settings
-) -> DataFrame:
-    """
-    Clean schema, handle nulls, remove duplicates.
-    
-    Args:
-        enriched_df: Feature-engineered DataFrame
-        settings: Settings instance with configuration
-        
-    Returns:
-        DataFrame: Cleaned and prepared DataFrame
-    """
+### Step 2: Materialize to Online Store
+
+After the batch pipeline completes, materialize the offline features to your Redis online store:
+
+```bash
+# Using Feast CLI
+feast materialize-incremental 2024-01-15T10:31:05Z
+
+# Or from Python
+from feast import FeatureStore
+fs = FeatureStore()
+fs.materialize_incremental(end_date=datetime(2024, 1, 15, 10, 31, 5))
 ```
 
-**Why:**
-- Complete docstrings with Args, Returns, Raises
-- Better IDE autocompletion
-- Easier for team collaboration
-- Self-documenting code
+### Step 3: Retrieve Features at Inference Time
 
----
-
-### 7. **Timestamp Logging for Completion**
-
-**Before:**
 ```python
-print(f"[✓] Pipeline completed successfully. {row_count} rows appended.")
+from feast import FeatureStore
+from datetime import datetime
+
+fs = FeatureStore()
+
+# Request features for a specific machine
+features_df = fs.get_online_features(
+    features=[
+        "machine_batch_features:Daily_Vibration_PeakMean_Ratio",
+        "machine_streaming_features:Vibration_RollingMax_10min",
+        "machine_streaming_features:Current_Imbalance_RollingMean_5min"
+    ],
+    entity_rows=[
+        {"Machine_ID": 1},
+        {"Machine_ID": 2},
+        {"Machine_ID": 3}
+    ]
+)
+
+# Returns all features (batch + streaming) in a single vector
+print(features_df)
 ```
 
-**After:**
-```python
-end_time = datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat()
-print(f"[✓] Pipeline completed successfully at {end_time}")
-print(f"[✓] Features written to: {output_path}")
+## Data Flow Diagram
+
+```
+┌──────────────────────────────────────────┐
+│  Raw Industrial Washer Data              │
+│  (sensors, timestamps, etc.)             │
+└────────────────────┬─────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────┐
+│  data_engineering.py (Your Data Pipeline)│
+│  Computes streaming features             │
+│  Rolling windows, derived columns, etc.  │
+└────────────────────┬─────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────┐
+│  Processed Dataset (Data Warehouse)      │
+│  data/processed_datasets/industrial_...  │
+└────────────────────┬─────────────────────┘
+                     │
+        ┌────────────┴────────────┐
+        │                         │
+        ▼                         ▼
+   ┌─────────────┐        ┌──────────────────┐
+   │  (Optional) │        │  batch_job.py    │
+   │  Real-time  │        │  (This script)   │
+   │  Streaming  │        │                  │
+   │  Pipeline   │        │  Daily features  │
+   └─────┬───────┘        └────────┬─────────┘
+         │                         │
+         │                    Writes to
+         │                         │
+         │    ┌────────────────────┘
+         │    │
+         ▼    ▼
+    ┌──────────────────────┐
+    │  Offline Store       │
+    │  (Parquet files)     │
+    │  data/offline/...    │
+    └──────────┬───────────┘
+               │
+               │ feast materialize-incremental
+               ▼
+    ┌──────────────────────┐
+    │  Online Store        │
+    │  (Redis)             │
+    │  redis:6379          │
+    └──────────┬───────────┘
+               │
+               │ Feature retrieval at inference time
+               ▼
+    ┌──────────────────────┐
+    │  ML Model            │
+    │  Anomaly Detector    │
+    │  (Predicts faults)   │
+    └──────────────────────┘
 ```
 
-**Why:**
-- Useful for auditing and tracking job execution
-- UTC timezone ensures consistency across regions
-- Matches pattern from `job.py` (see main() function)
+## Troubleshooting
 
----
+### Issue: FileNotFoundError - Input Parquet not found
 
-### 8. **Fixed config.py Duplication Bug**
+**Cause**: The data warehouse directory path is incorrect or doesn't exist
 
-**Before (config.py had these twice):**
-```python
-WRITE_MODE = "append"
-ALLOW_NULL_VALUES = False
+**Solution**:
+1. Verify the directory exists: `ls data/processed_datasets/industrial_washer_normal_features/`
+2. Check the path in `batch_config.yaml`
+3. Ensure the upstream data engineering pipeline has completed successfully
+
+### Issue: Spark OutOfMemory error
+
+**Cause**: Too many partitions or large dataset for available memory
+
+**Solution**:
+1. Reduce `spark_partitions` in `batch_config.yaml`
+2. Reduce Spark executor memory in `configs`: adjust `spark.executor.memory`
+3. Enable caching only if necessary: `cache_intermediate: true`
+
+### Issue: Feature values are all NULL
+
+**Cause**: First-period guard is too aggressive or data quality issues
+
+**Solutions**:
+1. Check that your data has complete daily coverage (not just partial days)
+2. Verify timestamp column is correctly named and parsed
+3. Review data quality logs for dropped rows due to null timestamps
+
+### Issue: Parquet files not readable by Feast
+
+**Cause**: Output format doesn't match Feast's expectations
+
+**Solution**: 
+- Verify partition structure: `ls -la data/offline/machine_batch_features/`
+- Should show multiple `part-*.parquet` files (not subdirectories)
+- Data types must match schema defined in `features.py`
+
+## Performance Tuning
+
+### For Large Datasets
+
+```yaml
+processing:
+  repartition: true
+  repartition_count: 32  # Increase for parallel writes
+
+spark:
+  partitions: 32
+  configs:
+    "spark.sql.shuffle.partitions": "64"
+    "spark.driver.memory": "8g"
+    "spark.executor.memory": "4g"
 ```
 
-**After:**
-- Removed duplicate entries
-- Single source of truth for each config value
+### For Local Development
 
----
-
-### 9. **Better Error Context**
-
-**Before:**
-```python
-except Exception as e:
-    print(f"[!] Error during pipeline execution: {e}")
-    raise
+```yaml
+spark:
+  partitions: 4
+  master: "local[2]"
+  configs:
+    "spark.driver.memory": "2g"
 ```
 
-**After:**
-```python
-except FileNotFoundError as e:
-    print(f"[!] File not found error: {e}")
-    raise
-except Exception as e:
-    print(f"[!] Error during pipeline execution: {e}")
-    raise
-finally:
-    print("[*] Stopping Spark Session...")
-    spark.stop()
-```
+## Related Files
 
-**Why:**
-- Handles specific exceptions with appropriate messages
-- Always cleans up Spark session
-- Better debugging information
-
----
-
-## Summary of Benefits
-
-| Aspect | Before | After |
-|--------|--------|-------|
-| Configuration | Static class properties | Type-safe dataclass |
-| Error Handling | Silent failures | Explicit validation |
-| Code Organization | Single large function | Modular, testable functions |
-| Path Handling | String concatenation | Type-safe Path objects |
-| Documentation | Minimal | Comprehensive docstrings |
-| Reusability | Low | High |
-| Testability | Difficult | Easy |
-| Following Patterns | Not aligned with job.py | Aligned with best practices |
-
----
-
-## How to Use the Improved Code
-
-1. **Replace your files:**
-   - Use `batch_pipeline_improved.py` instead of `batch_pipeline.py`
-   - Use `config_improved.py` instead of `config.py`
-
-2. **Environment variables still work:**
-   ```bash
-   export HISTORICAL_DIR="/data/raw"
-   export OFFLINE_DIR="/data/features"
-   export SPARK_PARTITIONS=8
-   python batch_pipeline_improved.py
-   ```
-
-3. **Can now be easily tested:**
-   ```python
-   # Test helper functions individually
-   settings = load_settings()
-   assert validate_settings(settings)
-   
-   # Mock DataFrame operations in unit tests
-   ```
-
-4. **Extensible for future features:**
-   - Add new processing steps by creating new functions
-   - Each function is independent and testable
-   - Easy to add partition columns, incremental logic, etc.
-
----
+- **`batch_config.yaml`**: Configuration file (modify paths and Spark settings here)
+- **`features.py`**: Feast feature view definitions (must match output columns)
+- **`data_sources.py`**: Feast data source configuration
+- **`entity.py`**: Machine entity definition
+- **`feature_services.py`**: Feature service grouping
+- **`data_engineering.py`**: Your original data engineering pipeline (for reference)
 
 ## Next Steps
 
-Consider implementing:
-- Unit tests for each helper function
-- Logging with Python's `logging` module instead of prints
-- Metrics/monitoring (rows processed, execution time, etc.)
-- Partitioning strategy (e.g., by date) similar to `job.py`
+1. **Create** `batch_config.yaml` with your paths
+2. **Run** the batch pipeline: `python batch_job.py`
+3. **Verify** output in offline store directory
+4. **Materialize** to online store with Feast CLI
+5. **Retrieve** features in your inference code
+
+## Support
+
+For issues or questions:
+1. Check logs in the console output
+2. Verify configuration in `batch_config.yaml`
+3. Review Spark UI at `http://localhost:4040` (during execution)
+4. Check Feast documentation: https://docs.feast.dev/

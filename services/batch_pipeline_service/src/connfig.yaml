@@ -1,0 +1,66 @@
+# Batch Job Configuration for Machine Batch Features
+# This configuration file defines paths, Spark settings, and feature engineering parameters
+
+# Data paths
+paths:
+  # Input: raw/processed industrial washer data from data warehouse
+  data_warehouse_dir: "data/processed_datasets/industrial_washer_normal_features"
+  
+  # Output: offline feature store for Feast
+  offline_store_dir: "data/offline/machine_batch_features"
+
+# Spark configuration
+spark:
+  # Application name for Spark UI and logs
+  app_name: "batch-feature-pipeline-washing-machines"
+  
+  # Master URL: "local[*]" for single-machine, "spark://..." for cluster
+  master: "local[*]"
+  
+  # Number of partitions for parallelization
+  partitions: 8
+  
+  # Additional Spark configurations
+  configs:
+    "spark.sql.session.timeZone": "UTC"
+    "spark.sql.shuffle.partitions": "16"
+    "spark.driver.memory": "4g"
+    "spark.executor.memory": "2g"
+
+# Schema configuration
+schema:
+  # Timestamp column name in the input data
+  timestamp_column: "timestamp"
+  
+  # Partition column(s) — typically the entity key
+  partition_columns:
+    - "Machine_ID"
+
+# Batch feature engineering parameters
+batch_features:
+  # Daily vibration peak-to-mean ratio
+  # Formula: max(Vibration_mm_s) / mean(Vibration_mm_s)
+  # Interpretation: High ratio indicates impulsive / spiky behavior = mechanical issues
+  daily_vibration_ratio:
+    enabled: true
+    feature_name: "Daily_Vibration_PeakMean_Ratio"
+    source_column: "Vibration_mm_s"
+    aggregation_type: "daily"  # 'daily' or 'weekly'
+    description: "Daily peak-to-mean vibration ratio per machine"
+
+# Data quality & processing settings
+processing:
+  # How to handle overwrite: "overwrite", "append", "ignore", "error"
+  write_mode: "overwrite"
+  
+  # Whether to repartition before writing (for better file distribution)
+  repartition: false
+  repartition_count: 8
+  
+  # Cache intermediate dataframes (use with caution on memory-constrained systems)
+  cache_intermediate: false
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
