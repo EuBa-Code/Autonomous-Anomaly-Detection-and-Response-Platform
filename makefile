@@ -228,10 +228,6 @@ logs-train:
 
 # ---------
 
-debug_streaming: 
-	uv run -m --group data-offline utils.create_offline_files && \
-	docker compose up --build redis redpanda redpanda-console feature_store_apply feature_store_service streaming_service producer_service
-
 debug_training:
 	docker compose up --build feature_store_service mlflow training_service
 
@@ -246,4 +242,10 @@ debug_inference:
 
 debug_inference_2:
 	docker compose build --no-cache inference_service
+
+
+debug_all: 
+	uv run -m --group data-offline utils.create_offline_files && \
+	docker compose up --build redis mlflow redpanda redpanda-console offline_files && \ 
+	feature_store_apply feature_store_service streaming_service inference_service producer_service
 

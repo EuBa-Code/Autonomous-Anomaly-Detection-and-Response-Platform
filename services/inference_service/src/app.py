@@ -2,7 +2,6 @@
 Inference Pipeline — Washing Machine Anomaly Detection
 ======================================================
 
-Follows the professor's pattern:
   - Model loaded once at startup (closure)
   - Feast features fetched via HTTP REST (/get-online-features)
   - score() applied to every message via sdf.apply()

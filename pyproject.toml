@@ -93,6 +93,7 @@ inference = [
     "feast[redis]>=0.30.0",
     "python-dotenv>=1.0.0",
     "confluent-kafka>=2.11.1",
+    "quixstreams>=3.23.3",
 ]
 rag-service = [
     "fastembed>=0.7.4",
