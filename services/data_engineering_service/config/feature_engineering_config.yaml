@@ -6,13 +6,13 @@
 datasets:
   - name: "industrial_washer_normal"
     input_path: "data/synthetic_datasets/industrial_washer_normal"
-    output_path: "data/offline/machines_batch_features"
+    output_path: "data/processed_datasets/machines_batch_features"
     file_format: "parquet"
     has_labels: false
     
   - name: "industrial_washer_with_anomalies"
     input_path: "data/synthetic_datasets/industrial_washer_with_anomalies"
-    output_path: "data/offline/machines_with_anomalies_features"
+    output_path: "data/processed_datasets/machines_with_anomalies_features"
     file_format: "parquet"
     has_labels: true
     label_column: "is_anomaly"

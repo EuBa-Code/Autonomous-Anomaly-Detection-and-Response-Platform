@@ -175,6 +175,7 @@ services:
       - SPARK_DRIVER_MEMORY=2g
     volumes:
       - ./data:/app/data
+      - ./services/data_engineering_service:/app/services/data_engineering_service 
     ports:
       - "4041:4040"
     networks:
