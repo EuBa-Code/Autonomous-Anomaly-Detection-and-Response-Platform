@@ -23,7 +23,7 @@ class Config:
 
     # ── Feast feature server (HTTP REST) ──────────────────────────────────────
     # Point to the `feast serve` container, e.g. http://feast-server:6566
-    FEAST_SERVER_URL:          str  = os.getenv("FEAST_SERVER_URL",      "http://feast-server:6566")
+    FEAST_SERVER_URL:          str  = os.getenv("FEAST_SERVER_URL",      "http://feature_store_service:6566")
     FEAST_FEATURE_SERVICE:     str  = os.getenv("FEAST_FEATURE_SERVICE", "machine_anomaly_service_v1")
     FEAST_ENTITY_KEY:          str  = os.getenv("FEAST_ENTITY_KEY",      "Machine_ID")
     FEAST_FULL_FEATURE_NAMES:  bool = os.getenv("FEAST_FULL_FEATURE_NAMES", "false").lower() == "true"
@@ -31,7 +31,7 @@ class Config:
 
     # ── MLflow Model Registry ─────────────────────────────────────────────────
     MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
-    MLFLOW_MODEL_NAME:   str = os.getenv("MLFLOW_MODEL_NAME",   "washing_machine_anomaly_detector")
+    MLFLOW_MODEL_NAME:   str = os.getenv("MLFLOW_MODEL_NAME",   "if_anomaly_detector")
 
     # Stage can be "latest", "Production", "Staging", or a version number
     MLFLOW_MODEL_STAGE:  str = os.getenv("MLFLOW_MODEL_STAGE",  "latest")

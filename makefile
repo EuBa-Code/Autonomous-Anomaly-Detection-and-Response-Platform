@@ -246,6 +246,5 @@ debug_inference_2:
 
 debug_all: 
 	uv run -m --group data-offline utils.create_offline_files && \
-	docker compose up --build redis mlflow redpanda redpanda-console offline_files && \ 
-	feature_store_apply feature_store_service streaming_service inference_service producer_service
+	docker compose up --build redis mlflow redpanda redpanda-console feature_store_apply feature_store_service streaming_service inference_service producer_service -d
 

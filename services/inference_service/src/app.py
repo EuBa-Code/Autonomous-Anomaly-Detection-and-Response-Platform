@@ -14,6 +14,7 @@ Data flow:
 import logging
 from datetime import datetime, timezone
 from typing import Any
+import os
 
 import mlflow
 import mlflow.sklearn
@@ -29,6 +30,7 @@ from config import Config
 
 logging.basicConfig(level=Config.LOG_LEVEL, format=Config.LOG_FORMAT)
 logger = logging.getLogger(Config.SERVICE_NAME)
+logging.info(f"Workdir: {os.getcwd()}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -127,6 +129,8 @@ def feast_get_online_features(
         value   = (res.get("values")   or [None])[0]
         features[name] = value if status == "PRESENT" else None
 
+    logging.info(features)
+
     return features
 
 
@@ -221,7 +225,7 @@ def main() -> None:
         """
         # ── Build output skeleton (always populated, even on error) ──────────
         out = {
-            "machine_id":        msg.get("Machine_ID") or msg.get("machine_id"),
+            "machine_id":        msg.get("Machine_ID"), # or msg.get("machine_id"),
             "source_timestamp":  msg.get("timestamp", ""),
             "scored_at":         datetime.now(timezone.utc).isoformat(),
             "model_uri":         model_uri,

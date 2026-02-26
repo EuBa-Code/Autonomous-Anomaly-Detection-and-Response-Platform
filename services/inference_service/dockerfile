@@ -24,8 +24,10 @@ COPY services/inference_service/config/ config/
 
 # Set Environment for imports
 # Add /inference_service (for config) and /inference_service/src (for preprocessor) to PYTHONPATH
-ENV PYTHONPATH="/inference_service:/inference_service/src:$PYTHONPATH"
-ENV PATH="/inference_service/.venv/bin:$PATH"
+# ENV PYTHONPATH="/inference_service:/inference_service/:$PYTHONPATH"
+# ENV PATH="/inference_service/.venv/bin:$PATH"
 
 # Default Command
-CMD ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "-m", "src.app"]
+# CMD ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
