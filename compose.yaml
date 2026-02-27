@@ -426,6 +426,35 @@ services:
       - anomaly-detection-network
     restart: unless-stopped  
     
+# ============================================================================
+  # FEAST MATERIALIZE - Loads batch features into Redis
+  # ============================================================================
+  feast_materialize:
+    build:
+      context: .
+      dockerfile: services/feature_store_service/Dockerfile
+    container_name: feast_materialize
+    depends_on:
+      batch_feature_pipeline:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data/registry:/data/registry
+      - ./data/offline:/data/offline
+      - ./services/feature_store_service/src:/feature_store_service/src:ro
+    command:
+      - "uv"
+      - "run"
+      - "feast"
+      - "materialize-incremental"
+      - "2030-01-01T00:00:00"
+    networks:
+      - anomaly-detection-network
+    restart: "no"
+
 networks:
   anomaly-detection-network:
     driver: bridge

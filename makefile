@@ -250,5 +250,17 @@ debug_all:
 	docker compose up --build redis mlflow redpanda redpanda-console feature_store_apply feature_store_service streaming_service inference_service producer_service -d
 
 debug_streaming:
-		uv run -m --group data-offline utils.create_offline_files && \
-		docker compose up --build redpanda redis redpanda-console feature_store_apply feature_store_service streaming_service producer_service -d
+	uv run --group data-offline -m utils.create_offline_files && \
+	docker compose up --build \
+		redpanda \
+		redpanda-console \
+		redis \
+		batch_feature_pipeline \
+		feature_store_apply \
+		feast_materialize \
+		feature_store_service \
+		streaming_service \
+		producer_service \
+		-d
+
+# create_datasets inside debug_streaming
