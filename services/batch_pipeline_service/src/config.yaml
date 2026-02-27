@@ -4,8 +4,7 @@
 # Data paths
 paths:
   # Input: raw/processed industrial washer data from data warehouse
-  data_warehouse_dir: "/app/data/processed_datasets/industrial_washer_normal_features"
-  
+  data_warehouse_dir: "/app/data/processed_datasets/machines_batch_features"    
   # Output: offline feature store for Feast
   offline_store_dir: "/app/data/offline/machine_batch_features"
 

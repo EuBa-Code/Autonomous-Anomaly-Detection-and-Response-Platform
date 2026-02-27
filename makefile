@@ -245,11 +245,7 @@ debug_inference_2:
 	docker compose build --no-cache inference_service
 
 
-debug_all: 
-	uv run -m --group data-offline utils.create_offline_files && \
-	docker compose up --build redis mlflow redpanda redpanda-console feature_store_apply feature_store_service streaming_service inference_service producer_service -d
-
-debug_streaming:
+debug_all:
 	uv run --group data-offline -m utils.create_offline_files && \
 	docker compose up --build \
 		redpanda \
@@ -262,5 +258,6 @@ debug_streaming:
 		streaming_service \
 		producer_service \
 		-d
-
-# create_datasets inside debug_streaming
+debug_streaming:
+		uv run --group data-offline -m utils.create_offline_files && \
+		docker compose up --build redpanda redis redpanda-console feature_store_apply feature_store_service batch_feature_pipeline feast_materialize streaming_service producer_service -d

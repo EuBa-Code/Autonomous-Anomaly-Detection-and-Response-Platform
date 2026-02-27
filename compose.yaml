@@ -279,11 +279,11 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - PYTHONUNBUFFERED=1
-      - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
-      - FEAST_REPO_PATH=/streaming_service
-      - ENTITYDF_DIR=/data/entity_df
-      - DATALAKE_FORMAT=parquet
+    - PYTHONUNBUFFERED=1
+    - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
+    - FEAST_REPO_PATH=/streaming_service
+    - DATALAKE_DIR=/data/entity_df        
+    - DATALAKE_FORMAT=parquet
     volumes:
       - ./data/models:/streaming_service/data/models:ro
       - ./data/registry:/data/registry
