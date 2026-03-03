@@ -233,7 +233,7 @@ debug_training:
 	docker compose up --build mlflow training_service
 
 offline_files:
-	uv run -m --group data-offline utils.create_offline_files
+	uv run -m utils.create_offline_files
 
 debug_batch:
 	docker compose up --build batch_feature_pipeline
@@ -246,7 +246,7 @@ debug_inference_2:
 
 
 debug_all:
-	uv run --group data-offline -m utils.create_offline_files && \
+	uv run -m utils.create_offline_files && \
 	docker compose up --build \
 		redpanda \
 		redpanda-console \
@@ -259,5 +259,5 @@ debug_all:
 		producer_service \
 		-d
 debug_streaming:
-		uv run --group data-offline -m utils.create_offline_files && \
+		uv run -m utils.create_offline_files && \
 		docker compose up --build redpanda redis redpanda-console feature_store_apply feature_store_service batch_feature_pipeline feast_materialize streaming_service producer_service -d

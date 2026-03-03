@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 
 dependencies = [
+    "pyarrow>=22.0.0",
 ]
 
 [dependency-groups]
@@ -20,19 +21,16 @@ ingestion = [
     "joblib>=1.4.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
-    "pyarrow>=19.0.0",
 ]
 
 
 data-engineering = [
-    "pyarrow>=22.0.0",
     "pyspark>=4.1.1",
     "pyyaml>=6.0.3",
 ]
 
 training_ml = [
     "numpy>=2.4.1",
-    "pyarrow>=19.0.1",
     "scikit-learn>=1.8.0",
     "pandas>=2.2.0",
     "joblib>=1.4.0",
@@ -54,9 +52,6 @@ dataset-creation = [
 spark-services = [
     "pyspark>=4.1.1",
     "pyyaml>=6.0.3",
-]
-data-offline = [
-    "pyarrow>=19.0.1",
 ]
 training-pipeline = [
     "feast[redis,duckdb]>=0.58.0",

@@ -113,6 +113,9 @@ def run_streaming_service():
         directory=os.getenv("DATALAKE_DIR", "/data/entity_df"),
         format=os.getenv("DATALAKE_FORMAT", "parquet"),
     )
+
+    sdf.sink(raw_sink)
+
     def _safe_float(value, default: float = 0.0) -> float:
         """Cast to float and replace NaN/Inf with a safe default."""
         try:

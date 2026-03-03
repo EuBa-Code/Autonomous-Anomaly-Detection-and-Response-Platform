@@ -1,70 +1,61 @@
 """
-Redpanda Producer — Streams telemetry data from Parquet to Redpanda.
+Redpanda Producer — Streams telemetry data from Parquet to Redpanda using quixstreams.
 
 Simulates real-time sensor data by reading from a Parquet file
 and publishing messages to the telemetry-data topic in batches.
 """
 import time
-import json
 import logging
 import pandas as pd
-from confluent_kafka import Producer
+from quixstreams import Application
 from config.config import Config
-
-BATCH_SIZE = 3
-BATCH_DELAY_SECONDS = 1
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("TelemetryProducer")
 
+app = Application(broker_address=Config.KAFKA_SERVER, consumer_group=Config.TOPIC_TELEMETRY)
+topic_telemetry = app.topic(Config.TOPIC_TELEMETRY, value_serializer='json')
 
-def delivery_report(err, msg):
-    """Callback to confirm message delivery to Redpanda."""
-    if err is not None:
-        logger.error(f"Delivery failed: {err}")
-
-
-def create_producer():
-    """Create a Redpanda producer (Kafka protocol compatible)."""
-    conf = {
-        'bootstrap.servers': Config.KAFKA_SERVER,
-        'linger.ms': 0,
-        'acks': 1,
-        'compression.type': 'snappy',
-    }
-    return Producer(conf)
-
-
-def start_streaming():
-    """Read Parquet file and stream records to Redpanda in batches."""
-    producer = create_producer()
+def main():
+    logger.info(f'PRODUCER: Reading parquet file: {Config.STREAMING_DATASET}')
 
     try:
         df = pd.read_parquet(Config.STREAMING_DATASET)
     except Exception as e:
-        logger.error(f"Failed to load dataset: {e}")
+        logger.error(f"Error while reading the Parquet file: {e}")
         return
 
-    total_records = len(df)
-    logger.info(f"Streaming {total_records} records to Redpanda topic '{Config.TOPIC_TELEMETRY}'")
+    total_rows = len(df)
+    logger.info(f"File loaded. Total rows to send: {total_rows}")
 
-    for i in range(0, total_records, BATCH_SIZE):
-        chunk = df.iloc[i : i + BATCH_SIZE]
-
-        for _, row in chunk.iterrows():
-            payload = json.dumps(row.to_dict(), default=str).encode("utf-8")
-            producer.produce(
-                Config.TOPIC_TELEMETRY,
-                value=payload,
-                callback=delivery_report,
+    with app.get_producer() as producer:
+        counter = 0
+        
+        for _, row in df.iterrows():
+            msg = topic_telemetry.serialize(
+                key=str(row['Machine_ID']),
+                value=row.to_dict()
             )
 
-        producer.flush()
-        logger.info(f"Sent batch {i // BATCH_SIZE + 1} ({len(chunk)} messages)")
-        time.sleep(BATCH_DELAY_SECONDS)
+            # Send single message
+            producer.produce(
+                topic=topic_telemetry.name,
+                value=msg.value,
+                key=msg.key  # Preserves message ordering
+            )
+            
+            counter += 1
 
-    logger.info(f"Streaming completed — {total_records} records sent")
+            # Batch delay handling (Real-time simulation)
+            if counter % Config.BATCH_SIZE == 0:
+                logger.info(f"Sent batch of {Config.BATCH_SIZE} messages. Waiting...")
+                time.sleep(Config.BATCH_DELAY_SECONDS)
 
+            # Progress log every 100 messages
+            if counter % 100 == 0:
+                logger.info(f'Progress: {counter}/{total_rows} messages sent.')
 
-if __name__ == "__main__":
-    start_streaming()
+    logger.info('Dataset fully uploaded to Redpanda!')
+
+if __name__ == '__main__':
+    main()

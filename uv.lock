@@ -5073,15 +5073,14 @@ wheels = [
 name = "washing-machines-anomaly-detection"
 version = "0.1.0"
 source = { virtual = "." }
+dependencies = [
+    { name = "pyarrow" },
+]
 
 [package.dev-dependencies]
 data-engineering = [
-    { name = "pyarrow" },
     { name = "pyspark" },
     { name = "pyyaml" },
-]
-data-offline = [
-    { name = "pyarrow" },
 ]
 dataset-creation = [
     { name = "pyspark" },
@@ -5113,7 +5112,6 @@ ingestion = [
     { name = "joblib" },
     { name = "numpy" },
     { name = "pandas" },
-    { name = "pyarrow" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "quixstreams" },
@@ -5165,7 +5163,6 @@ training-ml = [
     { name = "mlflow" },
     { name = "numpy" },
     { name = "pandas" },
-    { name = "pyarrow" },
     { name = "scikit-learn" },
 ]
 training-pipeline = [
@@ -5178,14 +5175,13 @@ training-pipeline = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "pyarrow", specifier = ">=22.0.0" }]
 
 [package.metadata.requires-dev]
 data-engineering = [
-    { name = "pyarrow", specifier = ">=22.0.0" },
     { name = "pyspark", specifier = ">=4.1.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]
-data-offline = [{ name = "pyarrow", specifier = ">=19.0.1" }]
 dataset-creation = [{ name = "pyspark", specifier = ">=4.1.1" }]
 dataset-creation-2 = [
     { name = "scikit-learn", specifier = ">=1.8.0" },
@@ -5210,7 +5206,6 @@ ingestion = [
     { name = "joblib", specifier = ">=1.4.0" },
     { name = "numpy", specifier = ">=2.4.1" },
     { name = "pandas", specifier = ">=2.2.0" },
-    { name = "pyarrow", specifier = ">=19.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "quixstreams", specifier = ">=3.0.0" },
@@ -5260,7 +5255,6 @@ training-ml = [
     { name = "mlflow", specifier = ">=2.10.0" },
     { name = "numpy", specifier = ">=2.4.1" },
     { name = "pandas", specifier = ">=2.2.0" },
-    { name = "pyarrow", specifier = ">=19.0.1" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
 ]
 training-pipeline = [

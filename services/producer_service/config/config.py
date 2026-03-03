@@ -15,3 +15,6 @@ class Config:
     
     # Absolute path to the file
     STREAMING_DATASET = DATA_DIR / STREAMING_DATASET_NAME
+
+    BATCH_SIZE = 3
+    BATCH_DELAY_SECONDS = 1

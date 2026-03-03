@@ -11,6 +11,7 @@ venv/
 # Personal files
 ImportantThings.txt
 test_1.py
+notes.txt
 
 # Parquet Files
 *.parquet
@@ -73,9 +74,6 @@ BUGFIX_LOG.md
 BUGFIX_LOG.md
 TODO.md
 
-# NOTA: MLOPS_FLOW_EXPLAINED.md e COMPREHENSIVE_PROJECT_DOCS.md
-# NON sono nel gitignore perché sono documentazione statica utile ai colleghi.
-# Non vengono rigenerati dal codice.
 COMPREHENSIVE_PROJECT_DOCS.md
 MLOPS_FLOW_EXPLAINED.md
 MASTER_LOGIC_FLOW.md
