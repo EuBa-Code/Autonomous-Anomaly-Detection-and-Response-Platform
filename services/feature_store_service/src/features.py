@@ -29,7 +29,7 @@ Why split?
 from datetime import timedelta
 
 from feast import FeatureView, Field
-from feast.types import Float32, Int64
+from feast.types import Float32 
 
 from entity import machine
 from data_sources import machines_batch_source, machines_stream_source
@@ -48,24 +48,28 @@ from data_sources import machines_batch_source, machines_stream_source
 #       - Current_Imbalance_RollingMean_5min (5-min rolling mean of the ratio above)
 # ==============================================================================
 
-machine_streaming_features = FeatureView(
-    name="machine_streaming_features",
+machine_streaming_features_10m = FeatureView(
+    name="machine_streaming_features_10m",
     entities=[machine],
-    ttl=timedelta(hours=12),
+    ttl=timedelta(minutes=10),
     schema=[
-        # ── Streaming pipeline features (PySpark rolling windows) ─────────────
-        # Intermediate derived scalar: (max(L1,L2,L3) - min(L1,L2,L3)) / mean(L1,L2,L3)
-        Field(name="Current_Imbalance_Ratio",           dtype=Float32),
-
         # 10-minute rolling maximum of Vibration_mm_s (per Machine_ID).
         Field(name="Vibration_RollingMax_10min",        dtype=Float32),
-
-        # 5-minute rolling mean of Current_Imbalance_Ratio (per Machine_ID).
-        Field(name="Current_Imbalance_RollingMean_5min", dtype=Float32),
     ],
     source=machines_stream_source,
 )
 
+machine_streaming_features_5min = FeatureView(
+    name="machine_streaming_features_5min",
+    entities=[machine],
+    ttl=timedelta(minutes=5),
+    schema=[
+        # Intermediate derived scalar: (max(L1,L2,L3) - min(L1,L2,L3)) / mean(L1,L2,L3)
+        Field(name="Current_Imbalance_Ratio",           dtype=Float32),
+        Field(name="Current_Imbalance_RollingMean_5min", dtype=Float32),
+    ],
+    source=machines_stream_source,
+)
 
 # ==============================================================================
 # BATCH FEATURE VIEW

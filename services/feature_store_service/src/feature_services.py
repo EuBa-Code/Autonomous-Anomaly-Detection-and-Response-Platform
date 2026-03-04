@@ -17,7 +17,7 @@ Service v1 — machine_anomaly_service_v1
 
 from feast import FeatureService
 
-from features import machine_streaming_features, machine_batch_features
+from features import machine_streaming_features_10m, machine_streaming_features_5min, machine_batch_features
 
 
 # ==============================================================================
@@ -27,7 +27,8 @@ from features import machine_streaming_features, machine_batch_features
 machine_anomaly_service_v1 = FeatureService(
     name="machine_anomaly_service_v1",
     features=[
-        machine_streaming_features,   # Raw sensors + rolling-window features
+        machine_streaming_features_10m, 
+        machine_streaming_features_5min,    # Raw sensors + rolling-window features
         machine_batch_features,        # Daily / weekly aggregation features
     ],
     description=(
