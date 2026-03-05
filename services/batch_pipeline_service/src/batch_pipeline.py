@@ -101,7 +101,7 @@ def load_settings(config_path: str = "config.yaml") -> Settings:
         # ── paths ──────────────────────────────────────────────────────────
         datalake_dir=paths.get(
             "data_warehouse_dir",
-            "/app/data/processed_datasets/industrial_washer_normal_features",
+            "/app/data/processed_datasets/machines_batch_features",
         ),
         offline_dir=paths.get(
             "offline_store_dir",

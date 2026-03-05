@@ -407,24 +407,24 @@ services:
   # ============================================================================
   # MCP SERVER - RAG Pipeline + LLM Integration
   # ============================================================================
-  mcp_server_service:
-    build:
-      context: .
-      dockerfile: services/mcp_server_service/dockerfile
-    container_name: mcp_server
-    profiles: [ "online" ]
-    depends_on:
-      qdrant:
-        condition: service_healthy
-      redpanda-init:
-        condition: service_completed_successfully
-    env_file:
-      - .env
-    ports:
-      - "8002:8000"
-    networks:
-      - anomaly-detection-network
-    restart: unless-stopped  
+  # mcp_server_service:
+  #   build:
+  #     context: .
+  #     dockerfile: services/mcp_server_service/dockerfile
+  #   container_name: mcp_server
+  #   profiles: [ "online" ]
+  #   depends_on:
+  #     qdrant:
+  #       condition: service_healthy
+  #     redpanda-init:
+  #       condition: service_completed_successfully
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - "8002:8000"
+  #   networks:
+  #     - anomaly-detection-network
+  #   restart: unless-stopped  
     
 # ============================================================================
   # FEAST MATERIALIZE - Loads batch features into Redis
@@ -454,6 +454,97 @@ services:
     networks:
       - anomaly-detection-network
     restart: "no"
+
+# ============================================================================
+  # AIRFLOW - Orchestration
+  # ============================================================================
+  postgres_airflow:
+    image: postgres:13
+    container_name: postgres_airflow
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - anomaly-detection-network
+
+  airflow-webserver:
+    build: 
+      context: .
+      dockerfile: ./services/airflow_service/Dockerfile
+    container_name: airflow_webserver
+    command: webserver
+    ports:
+      - "8081:8080" # Mapping to 8081 because Redpanda Console is on 8080
+    environment: &airflow-common-env
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      # Links to your other services
+      FEAST_REPO_PATH: /opt/airflow/feature_store
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./services/feature_store_service/src:/opt/airflow/feature_store:ro
+      - ./data:/opt/airflow/data
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres_airflow:
+        condition: service_healthy
+    networks:
+      - anomaly-detection-network
+
+  airflow-scheduler:
+    build: 
+      context: .
+      dockerfile: ./services/airflow_service/Dockerfile
+    container_name: airflow_scheduler
+    command: scheduler
+    environment: *airflow-common-env
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./services/feature_store_service/src:/opt/airflow/feature_store:ro
+      - ./data:/opt/airflow/data
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres_airflow:
+        condition: service_healthy
+    networks:
+      - anomaly-detection-network
+
+  airflow-init:
+    build: 
+      context: .
+      dockerfile: ./services/airflow_service/Dockerfile
+    container_name: airflow_init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db init &&
+        airflow users create \
+          --username airflow \
+          --firstname admin \
+          --lastname admin \
+          --role Admin \
+          --email admin@example.com \
+          --password airflow
+    environment: *airflow-common-env
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres_airflow:
+        condition: service_healthy
+    networks:
+      - anomaly-detection-network
 
 networks:
   anomaly-detection-network:
