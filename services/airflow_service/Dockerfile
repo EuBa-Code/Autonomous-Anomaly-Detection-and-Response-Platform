@@ -1,4 +1,4 @@
-FROM apache/airflow:2.10.2-python3.12
+FROM apache/airflow:2.10.2-python3.11
 
 USER root
 
@@ -10,11 +10,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
+# ✅ FIX: Switch to airflow user BEFORE pip/uv — the image blocks pip as root intentionally
 USER airflow
 
+# pip works fine as airflow user
 RUN pip install --upgrade uv
 
-RUN uv pip install --system \
+# ✅ Drop --system — airflow user installs to its own site-packages, no root needed
+RUN uv pip install \
     "apache-airflow==2.10.2" \
     "apache-airflow-providers-apache-spark" \
     "apache-airflow-providers-redis" \
@@ -22,4 +25,4 @@ RUN uv pip install --system \
     "mlflow" \
     "psycopg2-binary" \
     "pyspark" \
-    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.2/constraints-3.12.txt"
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.2/constraints-3.11.txt"
