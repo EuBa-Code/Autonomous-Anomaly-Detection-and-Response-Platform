@@ -66,7 +66,15 @@ def _to_epoch_ms(ts: str) -> int:
     """Convert an ISO-8601 string to epoch milliseconds."""
     return int(_parse_iso8601(ts).timestamp() * 1000)
 
+def _to_epoch_s(ts: str) -> int:
+    return int(_parse_iso8601(ts).timestamp())
 
+def timestamp_format(value: dict[str, Any]) -> dict[str, Any]:
+    
+    value['timestamp'] = _to_epoch_s(str(value.get('timestamp')))
+
+    return value
+    
 def timestamp_extractor(
     value: Any,
     headers: Any,
@@ -238,6 +246,7 @@ def main() -> None:
     )
 
     sdf = app.dataframe(topic)
+    sdf.apply(timestamp_format)
     sdf.sink(raw_sink)
 
     # Derived per-record feature — computed here so it is available to the
