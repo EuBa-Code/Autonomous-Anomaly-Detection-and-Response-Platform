@@ -25,4 +25,5 @@ RUN uv pip install \
     "mlflow" \
     "psycopg2-binary" \
     "pyspark" \
+    "apache-airflow-providers-docker" \
     --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.2/constraints-3.11.txt"

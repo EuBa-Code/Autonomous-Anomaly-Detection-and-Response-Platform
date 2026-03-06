@@ -45,6 +45,8 @@ VIBRATION_BACKFILL_DIR = os.path.join(BASE_DATA_DIR, "streaming_backfill/vibrati
 CURRENT_BACKFILL_DIR   = os.path.join(BASE_DATA_DIR, "streaming_backfill/current")
 BATCH_FEATURES_DIR      = os.path.join(BASE_DATA_DIR, "machines_batch_features")
 
+# Necessary to do materialization (for the first time)
+DATALAKE = "data\processed_datasets\machines_batch_features"
 
 # ── Schemas (must match features.py Field definitions + entity key) ───────────
 
@@ -70,10 +72,9 @@ BATCH_SCHEMA = pa.schema([
     pa.field("Daily_Vibration_PeakMean_Ratio", pa.float32()),
 ])
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _write_init_parquet(directory: str, schema: pa.Schema, personalized: str = 'init.parquet') -> None:
+def _write_init_parquet(directory: str, schema: pa.Schema, personalized: str = 'init.parquet', batch: bool = False) -> None:
     """
     Create *directory* (and any missing parents) and write a zero-row Parquet
     file named '_init_schema.parquet' with the given *schema*.
@@ -81,7 +82,7 @@ def _write_init_parquet(directory: str, schema: pa.Schema, personalized: str = '
     Skips silently if the init file already exists so the script is safe to
     re-run without overwriting live data written by the pipelines.
     """
-
+    
     init_path = os.path.join(directory, personalized)
 
     if os.path.isfile(init_path):
@@ -93,6 +94,65 @@ def _write_init_parquet(directory: str, schema: pa.Schema, personalized: str = '
 
     print(f"[OK]   Created : {init_path}")
     print(f"       Columns : {schema.names}")
+
+def single_materialization() -> None:
+    """
+    Read ALL partitioned Parquet files written by PySpark into DATALAKE,
+    keep only the most-recent row per Machine_ID (3 machines → 3 rows),
+    and write the result into the Feast offline-store path
+    (BATCH_FEATURES_DIR/materialization_seed.parquet).
+
+    Only the three columns declared in BATCH_SCHEMA are retained:
+        Machine_ID | timestamp | Daily_Vibration_PeakMean_Ratio
+    """
+    import pyarrow.dataset as ds
+
+    print("── Single materialisation seed ──")
+
+    # ── 1. Load every part-*.parquet produced by the Spark job ───────────────
+    print(f"   Reading dataset from : {DATALAKE}")
+    dataset = ds.dataset(DATALAKE, format="parquet")
+
+    # Project only the three columns we care about (saves memory on large sets)
+    table = dataset.to_table(
+        columns=["Machine_ID", "timestamp", "Daily_Vibration_PeakMean_Ratio"]
+    )
+    print(f"   Total rows loaded    : {len(table):,}")
+
+    # ── 2. Sort descending by timestamp, then keep first hit per machine ──────
+    #    After a descending sort the first occurrence of each Machine_ID is its
+    #    most-recent record — exactly one row per machine.
+    sorted_table = table.sort_by([("timestamp", "descending")])
+
+    df = sorted_table.to_pandas()
+    last_records = (
+        df.drop_duplicates(subset=["Machine_ID"], keep="first")
+          .reset_index(drop=True)
+    )
+
+    print(f"   Machines found       : {sorted(last_records['Machine_ID'].tolist())}")
+    print(f"   Rows kept (1/machine): {len(last_records)}")
+    print(last_records.to_string(index=False))
+
+    # ── 3. Cast back to the canonical Feast schema & write to offline store ───
+    result_table = pa.Table.from_pandas(
+        last_records,
+        schema=BATCH_SCHEMA,
+        preserve_index=False,
+    )
+
+    output_path = os.path.join(BATCH_FEATURES_DIR, "_init_schema.parquet")
+
+    if not os.path.isfile(output_path):
+        raise FileNotFoundError(
+            f"[ERROR] {output_path} not found. "
+            "Run _write_init_parquet() first to create the schema file."
+        )
+
+    pq.write_table(result_table, output_path, compression="snappy")
+
+    print(f"\n[OK]   Records written into : {output_path}")
+    print(f"       Columns              : {BATCH_SCHEMA.names}")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -114,6 +174,7 @@ if __name__ == "__main__":
 
     print("── Batch features (PySpark daily/weekly) ──")
     _write_init_parquet(BATCH_FEATURES_DIR, BATCH_SCHEMA, "_init_schema.parquet")
+    single_materialization()  
     print()
 
     print("=" * 60)

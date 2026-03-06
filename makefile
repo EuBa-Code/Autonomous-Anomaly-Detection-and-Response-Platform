@@ -245,7 +245,7 @@
 # 	docker compose build --no-cache inference_service
 
 create_offline:
-	uv run -m utils.create_offline_files
+	uv run --group offline-files -m utils.create_offline_files 
 
 # debug_all:
 # 	uv run -m utils.create_offline_files && \

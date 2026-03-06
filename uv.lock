@@ -5132,6 +5132,10 @@ mlflow-server = [
     { name = "mlflow" },
     { name = "psycopg2-binary" },
 ]
+offline-files = [
+    { name = "pandas" },
+    { name = "pyarrow" },
+]
 rag-service = [
     { name = "fastembed" },
     { name = "langchain-community" },
@@ -5217,6 +5221,10 @@ mlflow-server = [
     { name = "boto3", specifier = ">=1.34.0" },
     { name = "mlflow", specifier = ">=2.10.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
+]
+offline-files = [
+    { name = "pandas", specifier = ">=2.3.3" },
+    { name = "pyarrow", specifier = ">=22.0.0" },
 ]
 rag-service = [
     { name = "fastembed", specifier = ">=0.7.4" },

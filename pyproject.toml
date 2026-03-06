@@ -104,6 +104,10 @@ mcp-server-service = [
     "pydantic-settings>=2.11.0",
     "uvicorn>=0.34.0",
 ]
+offline-files = [
+    "pandas>=2.3.3",
+    "pyarrow>=22.0.0",
+]
 
 [[tool.uv.index]]
 name = "pytorch-cu126"

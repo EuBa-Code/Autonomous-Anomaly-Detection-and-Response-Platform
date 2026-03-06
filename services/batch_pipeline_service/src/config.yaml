@@ -3,7 +3,7 @@
 # Data paths
 paths:
   entitydf_dir:        "/app/data/entity_df/telemetry_data/0"
-  offline_store_dir:   "/app/data/offline/machine_batch_features"
+  offline_store_dir:   "/app/data/offline/machines_batch_features"
 
 # Spark configuration
 spark:
