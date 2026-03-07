@@ -143,7 +143,7 @@ services:
     command: [ "uv", "run", "feast", "serve", "--host", "0.0.0.0", "--port", "6566" ]
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      test: ["CMD", "curl", "-f", "http://localhost:6566/health"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -230,6 +230,25 @@ services:
     networks:
       - anomaly-detection-network
     restart: "no" 
+
+  cold_start:
+    build: 
+      context: .
+      dockerfile: utils/cold_start_util/Dockerfile
+    container_name: cold_start_util
+    profiles: [ "online" ]  
+    depends_on:
+      redis:
+        condition: service_healthy
+      # feature_store_service:
+      #   condition: service_healthy
+    volumes:
+      - ./data/registry:/data/registry
+      - ./data/offline:/data/offline
+      - ./services/feature_store_service/src:/cold_start_util/feature_store_service:ro
+    networks:
+      - anomaly-detection-network
+    restart: "no"
 
   # ============================================================================
   # PRODUCER - Sends telemetry data to Redpanda

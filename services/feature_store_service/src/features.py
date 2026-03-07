@@ -76,7 +76,7 @@ machine_streaming_features_5min = FeatureView(
 machine_batch_features = FeatureView(
     name="machine_batch_features",
     entities=[machine],
-    ttl=timedelta(days=7),
+    ttl=timedelta(days=365),
     schema=[
         # max(Vibration) / mean(Vibration) per calendar day.
         # A high ratio means repeated or sustained shock events across hundreds

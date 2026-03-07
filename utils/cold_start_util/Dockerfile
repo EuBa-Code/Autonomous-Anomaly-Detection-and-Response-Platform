@@ -8,6 +8,7 @@ COPY pyproject.toml uv.lock ./
 
 RUN uv sync --frozen --no-dev --group cold-start
 
-COPY utils/services/feature_store_service/src /cold_start_util/feature_store_service
+COPY services/feature_store_service/src /cold_start_util/feature_store_service
+COPY utils/cold_start_util/cold_start.py ./
 
 CMD ["uv", "run", "-m", "cold_start"]
