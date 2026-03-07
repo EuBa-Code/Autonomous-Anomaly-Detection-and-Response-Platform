@@ -1,0 +1,5 @@
+# Feast
+feast:
+  repo_path:     "/app/feature_store_service"
+  feature_views:
+    - "machine_batch_features"
