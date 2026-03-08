@@ -70,6 +70,20 @@ def main() -> None:
 
     x_train = df.drop(columns=drop_cols)
     del df  # free memory
+
+    # Cast integer columns to float64 to safely handle missing values at inference time.
+    # Integer dtype in pandas cannot represent NaN — if missing values appear at
+    # inference the schema enforcement would fail with a type mismatch error.
+    int_cols = x_train.select_dtypes(include="int").columns.tolist()
+    if int_cols:
+        x_train[int_cols] = x_train[int_cols].astype("float64")
+        logger.info(f"[DATA] Cast {len(int_cols)} integer column(s) → float64: {int_cols}")
+
+    # Cycle_Phase_ID is a categorical identifier, not a numeric magnitude.
+    if "Cycle_Phase_ID" in x_train.columns:
+        x_train["Cycle_Phase_ID"] = x_train["Cycle_Phase_ID"].astype(str)
+        logger.info("[DATA] Cast Cycle_Phase_ID → str (categorical)")
+
     logger.info(f"[DATA] Training features ({x_train.shape[1]}): {x_train.columns.tolist()}")
     logger.info(f"[DATA] Total rows available: {len(x_train):,}")
 
@@ -186,7 +200,7 @@ def main() -> None:
         signature = create_and_log_signature(x_train, pipe)
         mlflow_sklearn.log_model(
             pipe,
-            artifact_path="model",
+            name="model",
             signature=signature,
             registered_model_name=s.mlflow_model_name,  # new version added each week
         )

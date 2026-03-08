@@ -321,6 +321,7 @@ services:
       - PYTHONUNBUFFERED=1
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - FEAST_REPO_PATH=/feature_store
+      - GIT_PYTHON_REFRESH=quiet
     volumes:
       - ./data/registry:/data/registry:ro                              
       - ./data/offline:/data/offline:ro                                
