@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     # ── Feast / Feature Store ─────────────────────────────────────────────────
     feast_repo_path: str = "/feature_repo"           # path to feature_store.yaml inside the container
-    feature_service_name: str = "machines_v1"             # Feast FeatureService to use
+    feature_service_name: str = "machine_anomaly_service_v1"             # Feast FeatureService to use
     entity_df_path: str = "/datalake/telemetry_data/0"  # partitioned parquet directory
     event_timestamp_column: str = "event_timestamp"         # timestamp column name in entity_df
 

@@ -14,4 +14,4 @@ COPY services/retraining_service /retraining_service
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/retraining_service
 
-CMD ["uv", "run", "python", "-m", "retrain"]
+CMD ["uv", "run", "python", "-m", "src.retrain"]
