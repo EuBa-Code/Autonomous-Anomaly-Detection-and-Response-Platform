@@ -6188,19 +6188,17 @@ streaming = [
     { name = "quixstreams" },
     { name = "scikit-learn" },
 ]
-training-ml = [
-    { name = "joblib" },
+training = [
     { name = "mlflow" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "scikit-learn" },
 ]
-training-pipeline = [
-    { name = "feast", extra = ["duckdb", "redis"] },
+training-ml = [
+    { name = "joblib" },
     { name = "mlflow" },
     { name = "numpy" },
     { name = "pandas" },
-    { name = "pydantic-settings" },
     { name = "scikit-learn" },
 ]
 
@@ -6283,19 +6281,17 @@ streaming = [
     { name = "quixstreams", specifier = ">=3.0.0" },
     { name = "scikit-learn", specifier = ">=1.5.0" },
 ]
+training = [
+    { name = "mlflow", specifier = ">=3.9.0" },
+    { name = "numpy", specifier = ">=2.4.1" },
+    { name = "pandas", specifier = ">=2.3.3" },
+    { name = "scikit-learn", specifier = ">=1.8.0" },
+]
 training-ml = [
     { name = "joblib", specifier = ">=1.4.0" },
     { name = "mlflow", specifier = ">=2.10.0" },
     { name = "numpy", specifier = ">=2.4.1" },
     { name = "pandas", specifier = ">=2.2.0" },
-    { name = "scikit-learn", specifier = ">=1.8.0" },
-]
-training-pipeline = [
-    { name = "feast", extras = ["redis", "duckdb"], specifier = ">=0.58.0" },
-    { name = "mlflow", specifier = ">=3.9.0" },
-    { name = "numpy", specifier = ">=2.4.1" },
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "pydantic-settings", specifier = ">=2.11.0" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
 ]
 

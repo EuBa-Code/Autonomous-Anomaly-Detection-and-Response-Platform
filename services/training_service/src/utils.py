@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import time
-from typing import Tuple
 from mlflow.models import infer_signature, ModelSignature
 
 def create_and_log_signature(x_sample: pd.DataFrame, model_pipe) -> ModelSignature:
@@ -20,13 +19,3 @@ def create_and_log_signature(x_sample: pd.DataFrame, model_pipe) -> ModelSignatu
     )
     
     return signature
-
-def measure_latency(pipe, x_data: pd.DataFrame) -> float:
-    """
-    Measure average per‑record latency in milliseconds.
-    """
-    start_time = time.time()
-    _ = pipe.predict(x_data)
-    total_time_ms = (time.time() - start_time) * 1000
-    
-    return total_time_ms / len(x_data)

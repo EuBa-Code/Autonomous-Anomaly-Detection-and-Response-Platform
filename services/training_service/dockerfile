@@ -4,7 +4,7 @@ WORKDIR /training_service
 
 COPY pyproject.toml uv.lock* ./
 
-RUN uv sync --frozen --no-dev --group training-pipeline
+RUN uv sync --frozen --no-dev --group training
 
 COPY services/training_service/src ./src/
 COPY services/training_service/config ./config/
