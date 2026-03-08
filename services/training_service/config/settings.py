@@ -24,8 +24,7 @@ class Settings(BaseSettings):
 
     # ── Datalake ─────────────────────────────────────────────────────────────
     entity_df_path: str = (
-        "/training_service/data/processed_datasets/"
-        "industrial_washer_normal_features"
+        "/data/processed_datasets/machines_with_anomalies_features"
     )
     event_timestamp_column: str = "timestamp"
 
@@ -33,8 +32,8 @@ class Settings(BaseSettings):
     output_dir: str = "/outputs"   # matches Docker volume mount ./outputs:/outputs
 
     # ── Data processing ──────────────────────────────────────────────────────
-    max_fit_rows: int = 200_000        # subsample cap for IsolationForest fit
-    inference_chunk_size: int = 50_000 # rows per inference chunk
+    max_fit_rows: int = 50_000        # subsample cap for IsolationForest fit
+    inference_chunk_size: int = 10_000 # rows per inference chunk
 
     # ── Model hyperparameters ─────────────────────────────────────────────────
     class TrainingConfig(BaseModel):

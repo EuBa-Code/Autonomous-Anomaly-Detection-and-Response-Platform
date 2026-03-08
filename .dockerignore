@@ -3,3 +3,5 @@ data/
 models/
 .git/
 __pycache__/
+logs/
+**/logs/
