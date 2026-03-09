@@ -81,7 +81,7 @@ def main() -> None:
         sparse_embedding=sparse_embeddings,
         url=ingestion_settings.qdrant_url,
         api_key=ingestion_settings.qdrant_api_key,
-        prefer_grpc=False,
+        prefer_grpc=True,
         collection_name=ingestion_settings.qdrant_collection,
         retrieval_mode=RetrievalMode.HYBRID,
         force_recreate=True
