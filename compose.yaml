@@ -565,6 +565,32 @@ services:
     networks:
       - anomaly-detection-network
 
+  if_anomaly:
+    build:
+      context: .
+      dockerfile: services/if_anomaly_service/Dockerfile
+    container_name: if_anomaly_service
+    command: [ "-m", "anomaly_consumer" ]
+    environment:
+      - APP_HOME=/if_anomaly_service
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+      - SPARK_DRIVER_MEMORY=2g
+    networks:
+      - anomaly-detection-network
+    restart: "no"
+
+  fakeproducer:
+    build:
+      context: .
+      dockerfile: services/dockerfile.spark_services
+    container_name: create_datasets
+    command: [ "-m", "fakeproducer" ]
+    environment:
+      - APP_HOME=/if_anomaly_service
+    networks:
+      - anomaly-detection-network
+
 networks:
   anomaly-detection-network:
     driver: bridge

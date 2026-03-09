@@ -121,6 +121,11 @@ retraining = [
     "redis>=4.6.0",
     "scikit-learn>=1.8.0",
 ]
+if-anomaly = [
+    "pydantic-settings>=2.11.0",
+    "quixstreams>=3.23.3",
+    "requests>=2.32.5",
+]
 
 [[tool.uv.index]]
 name = "pytorch-cu126"

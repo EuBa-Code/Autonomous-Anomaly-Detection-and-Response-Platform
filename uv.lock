@@ -5098,6 +5098,11 @@ feature-store = [
 feature-store-apply = [
     { name = "feast", extra = ["duckdb", "redis"] },
 ]
+if-anomaly = [
+    { name = "pydantic-settings" },
+    { name = "quixstreams" },
+    { name = "requests" },
+]
 inference = [
     { name = "confluent-kafka" },
     { name = "fastapi" },
@@ -5201,6 +5206,11 @@ dataset-creation-2 = [
 ]
 feature-store = [{ name = "feast", extras = ["redis", "duckdb"], specifier = ">=0.58.0" }]
 feature-store-apply = [{ name = "feast", extras = ["redis", "duckdb"], specifier = ">=0.58.0" }]
+if-anomaly = [
+    { name = "pydantic-settings", specifier = ">=2.11.0" },
+    { name = "quixstreams", specifier = ">=3.23.3" },
+    { name = "requests", specifier = ">=2.32.5" },
+]
 inference = [
     { name = "confluent-kafka", specifier = ">=2.11.1" },
     { name = "fastapi", specifier = ">=0.100.0" },

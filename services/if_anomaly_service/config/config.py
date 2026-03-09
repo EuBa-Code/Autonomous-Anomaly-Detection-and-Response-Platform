@@ -1,15 +1,17 @@
-import os
+from pydantic_settings import BaseSettings
 
+class Settings(BaseSettings):
+    # Kafka / Redpanda
+    KAFKA_SERVER: str = "redpanda:9092"
+    TOPIC_TELEMETRY: str = "telemetry-data"
+    TOPIC_PREDICTIONS: str = "predictions"
+    AUTO_OFFSET_RESET: str = "earliest"
+    
+    # MCP Client API
+    # Assuming the MCP client is another service in the same network
+    MCP_API_URL: str = "http://mcp_client:8000"
 
-class Config:
-    """Runtime configuration for the Streaming Service.
+    class Config:
+        env_file = ".env"
 
-    All values can be overridden via environment variables so the same image
-    runs identically in development (docker-compose) and production (k8s).
-    """
-
-    # ── Kafka / Redpanda ──────────────────────────────────────────────────────
-    KAFKA_SERVER: str      = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "redpanda:9092")
-    TOPIC_TELEMETRY: str   = os.getenv("TOPIC_TELEMETRY", "predictions")
-    AUTO_OFFSET_RESET: str = os.getenv("AUTO_OFFSET_RESET", "latest")
-    CONSUMER_GROUP: str    = os.getenv("CONSUMER_GROUP", "anomaly-investigator-group")
+Config = Settings()
