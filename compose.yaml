@@ -570,12 +570,13 @@ services:
       context: .
       dockerfile: services/if_anomaly_service/Dockerfile
     container_name: if_anomaly_service
-    command: [ "-m", "anomaly_consumer" ]
+    depends_on:
+      redpanda:
+        condition: service_started
+    command: [ "-m", "src.anomaly_consumer" ]
     environment:
-      - APP_HOME=/if_anomaly_service
-      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/if_anomaly_service
       - LOG_LEVEL=INFO
-      - SPARK_DRIVER_MEMORY=2g
     networks:
       - anomaly-detection-network
     restart: "no"
@@ -583,13 +584,19 @@ services:
   fakeproducer:
     build:
       context: .
-      dockerfile: services/dockerfile.spark_services
+      dockerfile: services/if_anomaly_service/Dockerfile
     container_name: create_datasets
-    command: [ "-m", "fakeproducer" ]
+    depends_on:
+      redpanda:
+        condition: service_started
+    command: [ "-m", "src.fakeproducer" ]
     environment:
-      - APP_HOME=/if_anomaly_service
+      - PYTHONPATH=/if_anomaly_service
+      - LOG_LEVEL=INFO  
     networks:
       - anomaly-detection-network
+    restart: "no"
+
 
 networks:
   anomaly-detection-network:

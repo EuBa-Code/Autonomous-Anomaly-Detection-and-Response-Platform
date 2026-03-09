@@ -75,12 +75,6 @@ def timestamp_extractor(
         )
     return int(timestamp)
 
-import logging
-import requests  # Added for the API call
-from quixstreams import Application
-from typing import Any
-from config import Config
-
 
 def trigger_mcp_investigation(message: dict):
     """

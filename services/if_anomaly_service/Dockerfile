@@ -19,8 +19,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy application code using paths relative to build context (project root)
-COPY services/inference_service/src/ ./
-COPY services/inference_service/config/ config/
+COPY services/if_anomaly_service/src/ ./src/
+COPY services/if_anomaly_service/config/ ./config/
 
 # Default Command
 ENTRYPOINT ["uv", "run"]
