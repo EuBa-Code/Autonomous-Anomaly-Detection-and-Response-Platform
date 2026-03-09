@@ -148,6 +148,16 @@ mcp-server = [
     "sentence-transformers>=5.2.3",
     "uvicorn>=0.34.0",
 ]
+ingestion-rag = [
+    "langchain-community>=0.4.1",
+    "langchain-openai>=1.1.10",
+    "langchain-qdrant>=1.1.0",
+    "langchain-text-splitters>=1.1.1",
+    "pydantic>=2.12.5",
+]
+inference-rag = [
+    "langchain-huggingface>=1.2.1",
+]
 
 [[tool.uv.index]]
 name = "pytorch-cu126"
