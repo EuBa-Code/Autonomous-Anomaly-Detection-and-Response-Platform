@@ -5478,9 +5478,15 @@ ingestion = [
     { name = "quixstreams" },
 ]
 langchain-app = [
+    { name = "fastapi" },
+    { name = "httpx" },
     { name = "langchain" },
+    { name = "langchain-core" },
     { name = "langchain-mcp-adapters" },
     { name = "langchain-openai" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "uvicorn" },
 ]
 mcp-server-service = [
     { name = "confluent-kafka" },
@@ -5591,9 +5597,15 @@ ingestion = [
     { name = "quixstreams", specifier = ">=3.0.0" },
 ]
 langchain-app = [
+    { name = "fastapi", specifier = ">=0.129.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "langchain", specifier = ">=1.2.10" },
+    { name = "langchain-core", specifier = ">=1.2.15" },
     { name = "langchain-mcp-adapters", specifier = ">=0.2.1" },
     { name = "langchain-openai", specifier = ">=1.1.10" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 mcp-server-service = [
     { name = "confluent-kafka", specifier = ">=2.11.1" },

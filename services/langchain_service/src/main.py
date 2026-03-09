@@ -23,7 +23,7 @@ logger = logging.getLogger("main")
 
 
 def start_api() -> None:
-    from src.config import get_config
+    from config import get_config
     from src.api import app
 
     cfg = get_config()
@@ -35,27 +35,11 @@ def start_api() -> None:
     )
 
 
-def start_consumer() -> None:
-    from src.anomaly_consumer import run
-    run()
-
-
 if __name__ == "__main__":
     mode = os.getenv("MODE", "api").lower()
     logger.info("Starting MCP Client in MODE=%s", mode)
 
     if mode == "api":
         start_api()
-
-    elif mode == "consumer":
-        start_consumer()
-
-    elif mode == "both":
-        # Run consumer in a background thread; API in the main thread
-        t = threading.Thread(target=start_consumer, daemon=True, name="anomaly-consumer")
-        t.start()
-        logger.info("Anomaly consumer thread started.")
-        start_api()
-
     else:
-        raise ValueError(f"Unknown MODE='{mode}'. Use 'api', 'consumer', or 'both'.")
+        raise ValueError(f"Unknown MODE='{mode}'. Use 'api'.")

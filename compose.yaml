@@ -565,21 +565,31 @@ services:
     networks:
       - anomaly-detection-network
 
+  # ============================================================================
+  # IF ANOMALY TRUE - RedPanda consumer → dispatches to MCP Client API
+  # ============================================================================
   if_anomaly:
     build:
       context: .
       dockerfile: services/if_anomaly_service/Dockerfile
     container_name: if_anomaly_service
+    profiles: [ "online" ]
     depends_on:
       redpanda:
         condition: service_started
+      mcp_client_api:
+        condition: service_healthy
     command: [ "-m", "src.anomaly_consumer" ]
     environment:
       - PYTHONPATH=/if_anomaly_service
       - LOG_LEVEL=INFO
+      - MCP_CLIENT_URL=http://mcp_client_api:8010   
+      - REDPANDA_BROKERS=redpanda:9092
+      - PREDICTIONS_TOPIC=predictions
     networks:
       - anomaly-detection-network
-    restart: "no"
+    restart: unless-stopped                          
+
 
   fakeproducer:
     build:
@@ -597,6 +607,95 @@ services:
       - anomaly-detection-network
     restart: "no"
 
+  # ============================================================================
+  # MONGODB - Document Database (stores investigation reports + entity history)
+  # ============================================================================
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-admin}
+      MONGO_INITDB_DATABASE: anomaly_reports
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - anomaly-detection-network
+    restart: unless-stopped
+
+  # ============================================================================
+  # MCP SERVER - FastMCP + Hybrid RAG Retrieval (Qdrant dense+sparse + rerank)
+  # ============================================================================
+  mcp_server:
+    build:
+      context: .
+      dockerfile: services/mcp_server_service/Dockerfile
+    container_name: mcp_server
+    profiles: [ "online" ]
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    env_file:
+      - .env                              # QDRANT_API_KEY
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MODE=both                         # REST + FastMCP SSE on same port
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION=rag_documents
+    ports:
+      - "8020:8020"
+    networks:
+      - anomaly-detection-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8020/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s                   # cross-encoder model load takes time
+
+  # ============================================================================
+  # MCP CLIENT API - LangGraph agent (Tools → Agent → Thread)
+  # ============================================================================
+  mcp_client_api:
+    build:
+      context: .
+      dockerfile: services/mcp_client_service/Dockerfile
+    container_name: mcp_client_api
+    profiles: [ "online" ]
+    depends_on:
+      mcp_server:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MODE=api
+      - MCP_CLIENT_PORT=8010
+      - MCP_SERVER_URL=http://mcp_server:8020
+      - VLLM_BASE_URL=http://vllm:8000/v1
+      - REDPANDA_BROKERS=redpanda:9092
+    ports:
+      - "8010:8010"
+    networks:
+      - anomaly-detection-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+# ── Add to the volumes: block at the bottom of compose.yaml ──────────────────
+#  mongodb_data:
+#    driver: local
 
 networks:
   anomaly-detection-network:

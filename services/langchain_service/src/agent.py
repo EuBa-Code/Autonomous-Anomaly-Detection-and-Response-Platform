@@ -22,7 +22,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from typing_extensions import Annotated, TypedDict
 
-from .config import get_config
+from config import get_config
 from .tools import TOOLS
 
 logger = logging.getLogger(__name__)

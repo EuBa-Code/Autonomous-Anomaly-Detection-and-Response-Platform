@@ -1,0 +1,34 @@
+mcp_client:
+  host: "0.0.0.0"
+  port: 8010
+  log_level: "INFO"
+
+vllm:
+  base_url: "http://vllm:8000/v1"
+  model: "mistralai/Mistral-7B-Instruct-v0.3"  
+  temperature: 0.0
+  max_tokens: 1024
+
+mcp_server:
+  base_url: "http://mcp_server:8020"
+  endpoints:
+    retrieve_context: "/retrieve"
+    health: "/health"
+  timeout_seconds: 30
+
+redpanda:
+  bootstrap_servers: "redpanda:9092"
+  topics:
+    predictions: "predictions"
+  consumer_group: "anomaly-detector-group"
+  auto_offset_reset: "latest"
+  poll_timeout_ms: 1000
+
+langgraph:
+  max_iterations: 10
+  recursion_limit: 25
+  thread_id_prefix: "anomaly-thread"
+
+docling:
+  enabled: true
+  base_url: "http://docling:5001" 
