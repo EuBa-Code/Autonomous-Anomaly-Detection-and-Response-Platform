@@ -34,4 +34,4 @@ def retrive_context(query: str, machine_id: int):
     return formatted_docs
 
 if __name__ == '__main__':
-    mcp.run(transport='http', host='0.0.0.0', port=9000)
+    mcp.run(transport='http', host='0.0.0.0', port=8020)
