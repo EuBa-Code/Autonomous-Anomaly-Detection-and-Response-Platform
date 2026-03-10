@@ -647,10 +647,20 @@ services:
 
   qdrant:
     image: qdrant/qdrant:latest
+    deploy:
+      resources:
+        limits:
+          memory: 4G        # Increase as needed
+        reservations:
+          memory: 2G
     ports:
       - "6333:6333" # HTTP API 
       - "6334:6334" # gRPC API 
+    environment:
+      - QDRANT__STORAGE__ON_DISK_PAYLOAD=true
+      - ./qdrant_config.yaml:/qdrant/config/production.yaml
     volumes:
+      - ./services/mcp_server_service/qdrant/config/qdrant_config.yaml:/qdrant/config/production.yaml 
       - ./qdrant_data:/qdrant/storage
     networks:
       - anomaly-detection-network
@@ -693,7 +703,7 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_HOME=/root/.cache/huggingface
-      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}   
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}   
     volumes:
       - ./local_models/hf_cache:/root/.cache/huggingface  
     ports:
