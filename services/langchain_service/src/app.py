@@ -35,31 +35,51 @@ async def chat_stream(req: ChatRequest):
 
     async def event_generator():
         yield sse_pack('status', {'state': 'started'})
+        
+        # Initialize an accumulator for the final summary
+        full_text_list = []
 
         async for event in agent.astream_events(
             {'messages': [HumanMessage(content=req.message)]},
             version='v2'
         ):
-            e_type = event.get('event')
+            e_type = event['event']
 
+            # Handle Model Tokens
             if e_type == 'on_chat_model_stream':
                 chunk = event['data'].get('chunk')
-                if chunk and getattr(chunk, 'content', None):
-                    yield sse_pack('token', {'text': chunk.content})
-            elif e_type == 'on_tool_start':
-                yield sse_pack('tool_start', {'name': event.get('name')})
-            elif e_type == 'on_tool_end':
-                yield sse_pack('tool_end', {'name': event.get('name')})
+                if chunk and chunk.content:
+                    content = chunk.content
+                    full_text_list.append(content)
+                    yield sse_pack('token', {'text': content})
 
+            # Handle Tooling
+            elif e_type == 'on_tool_start':
+                yield sse_pack('tool_start', {'name': event['name']})
+            
+            elif e_type == 'on_tool_end':
+                # Optional: capture tool output for the log/summary
+                tool_output = event['data'].get('output')
+                yield sse_pack('tool_end', {'name': event['name'], 'output': str(tool_output)})
+
+        # Join the fragments for the final summary
+        full_response = "".join(full_text_list)
+        
         yield sse_pack('done', {'ok': True})
 
-        notify_operator(machine_id=req.machine_id, summary=full_response)
+        # Notify operator without blocking the final 'done' message
+        # Ensure notify_operator is either async or wrapped in a thread
+        try:
+            notify_operator(machine_id=req.machine_id, summary=full_response)
+        except Exception as e:
+            print(f"Failed to notify operator: {e}")
 
     return StreamingResponse(
         event_generator(),
-        media_type='text/event-stream',         
+        media_type='text/event-stream',
         headers={
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no', # Crucial for Nginx proxying
         },
     )

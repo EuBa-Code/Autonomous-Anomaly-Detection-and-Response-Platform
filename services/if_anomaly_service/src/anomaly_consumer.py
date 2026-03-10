@@ -20,7 +20,7 @@ import logging
 from quixstreams import Application
 from quixstreams.models import TimestampType
 from datetime import timezone, datetime
-
+import httpx
 from typing import Any
 
 from config import Config
@@ -82,27 +82,23 @@ def trigger_mcp_investigation(message: dict):
     """
     logger.info(f"🚨 ANOMALY DETECTED: Triggering investigation for {message.get('Machine_ID', 'unknown')}")
     
-    MCP_CLIENT_URL: str = "http://langchain_service:8010"  # correct name + port
+    MCP_CLIENT_URL: str = "http://langchain_service:8010"
 
-# anomaly_consumer.py
-    import httpx
+    payload = {
+        "message": (
+            f"Investigate anomaly for machine {message.get('Machine_ID')}. "
+            f"Score: {message.get('anomaly_score'):.3f}. "
+            f"Features: {message.get('features')}"
+        )
+    }
+    try:
+        with httpx.Client(timeout=30) as client:
+            r = client.post(f"{Config.MCP_CLIENT_URL}/chat/stream", json=payload)
+            r.raise_for_status()
+        logger.info("Investigation triggered successfully.")
+    except Exception as e:
+        logger.error(f"Failed to trigger MCP agent: {e}")
 
-    def trigger_mcp_investigation(message: dict):
-        payload = {
-            "message": (
-                f"Investigate anomaly for machine {message.get('machine_id')}. "
-                f"Score: {message.get('anomaly_score'):.3f}. "
-                f"Features: {message.get('features')}"
-            )
-        }
-        try:
-            with httpx.Client(timeout=30) as client:
-                r = client.post(f"{Config.MCP_CLIENT_URL}/chat/stream", json=payload)
-                r.raise_for_status()
-            logger.info("Investigation triggered successfully.")
-        except Exception as e:
-            logger.error(f"Failed to trigger MCP agent: {e}")
-            
 def main() -> None:
     logger.info('Starting Anomaly Consumer Service')
 
