@@ -150,13 +150,12 @@ mcp-server = [
 ]
 ingestion-rag = [
     "langchain-community>=0.4.1",
+    "langchain-huggingface>=1.2.1",
     "langchain-openai>=1.1.10",
     "langchain-qdrant>=1.1.0",
     "langchain-text-splitters>=1.1.1",
     "pydantic>=2.12.5",
-]
-inference-rag = [
-    "langchain-huggingface>=1.2.1",
+    "sentence-transformers>=5.2.3",
 ]
 
 [[tool.uv.index]]

@@ -10,7 +10,6 @@ from langchain_qdrant import QdrantVectorStore, FastEmbedSparse, RetrievalMode
 
 from config import ingestion_settings
 
-
 def load_txt_documents(data_dir: str | Path) -> List[Document]:
 
     if isinstance(data_dir, str):
