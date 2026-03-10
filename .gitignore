@@ -20,6 +20,7 @@ synthetic_datasets/
 data/offline
 data/
 logs/
+local_models/
 
 kafka_storage/
 

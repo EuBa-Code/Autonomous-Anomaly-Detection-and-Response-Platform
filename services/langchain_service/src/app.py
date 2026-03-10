@@ -20,8 +20,26 @@ async def get_agent():
                 _agent = await build_agent()
     return _agent
 
+# Server-Sent Events
 def sse_pack(event: str, data) -> str:
     return f'event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n'
 
 @app.post('/chat/stream')
-async def chat_stream(req: ChatRequest)
+async def chat_stream(req: ChatRequest):
+    agent = await get_agent()
+
+    async def event_generator():
+        yield sse_pack('status', {'state':'started'})
+
+        async for event in agent.astream_events(
+            {'messages':
+             [HumanMessage(content=req.message)]
+             },
+             version='v2'
+        ):
+            e_type = event.get('event')
+
+            if e_type == 'on_chat_model_stream':
+                chunk = event['data'].get('chunk')
+                if chunk and getattr(chunk, 'context', None):
+                    yield sse_pack('token', {'text': chunk.context})

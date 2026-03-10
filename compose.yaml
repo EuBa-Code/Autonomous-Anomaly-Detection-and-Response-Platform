@@ -669,14 +669,7 @@ services:
       - ./local_models:/ingestion_rag_service/models
     networks:
       - anomaly-detection-network
-    deploy: # Nvidia container toolkit (GPU)
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1 
-              capabilities: [gpu]
-      
+
 networks:
   anomaly-detection-network:
     driver: bridge
