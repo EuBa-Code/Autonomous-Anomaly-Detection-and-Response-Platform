@@ -18,5 +18,3 @@ class MongoLogger:
         }
 
         self.logs_collection.insert_one(log_entry)
-
-mongo_logger = MongoLogger()
