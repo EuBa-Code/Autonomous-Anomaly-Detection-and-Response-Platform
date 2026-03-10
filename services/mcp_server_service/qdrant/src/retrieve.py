@@ -1,7 +1,7 @@
 from langchain_huggingface import HuggingFaceEmbeddings 
 from langchain_qdrant import QdrantVectorStore, FastEmbedSparse, RetrievalMode
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
-from config import retrieval_settings
+from qdrant.config import retrieval_settings
 from flashrank import Ranker
 from langchain_community.document_compressors import FlashrankRerank
 from langchain_classic.retrievers import ContextualCompressionRetriever
