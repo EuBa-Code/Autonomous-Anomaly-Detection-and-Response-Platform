@@ -66,12 +66,16 @@ def main() -> None:
     dense_embeddings = HuggingFaceEmbeddings(
         model_name=ingestion_settings.embedding_model, 
         model_kwargs={'device': 'cpu'},
-        cache_folder='ingestion_rag_service/models/hugging_face'
+        cache_folder='/ingestion_rag_service/models/hugging_face'
+
     )
 
     # Sparse embeddings configuration using BM25 algorithm
-    sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
-
+    sparse_embeddings = FastEmbedSparse(
+        model_name="Qdrant/bm25",
+        cache_dir='/ingestion_rag_service/models/fastembed'
+    )
+    
     # 3. Create Hybrid Vector Store
     print(f"Creating collection '{ingestion_settings.qdrant_collection}' and indexing...")
 

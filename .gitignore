@@ -23,7 +23,7 @@ logs/
 local_models/
 
 kafka_storage/
-
+qdrant_data/
 
 data/
 
