@@ -12,10 +12,9 @@ RUN apt-get update \
     && curl -LsSf https://astral.sh/uv/install.sh | sh \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PATH="/root/.cargo/bin:$PATH"
+ENV PATH="/root/.local/bin:$PATH"
 
 WORKDIR /ingestion_rag_service
-
 COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -23,5 +22,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --index "pytorch-cu126=https://download.pytorch.org/whl/cu126"
 
 COPY services/ingestion_rag_service/ ./
-
 CMD ["uv", "run", "-m", "src.ingestion"]
