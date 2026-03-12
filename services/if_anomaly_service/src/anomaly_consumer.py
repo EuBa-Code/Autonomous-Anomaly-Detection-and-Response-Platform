@@ -75,7 +75,6 @@ def timestamp_extractor(
         )
     return int(timestamp)
 
-
 def trigger_mcp_investigation(message: dict):
     """
     This function handles the side effect of calling the MCP API.
