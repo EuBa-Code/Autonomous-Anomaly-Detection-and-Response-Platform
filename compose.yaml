@@ -605,6 +605,10 @@ services:
       - MODE=both                         # REST + FastMCP SSE on same port
     ports:
       - "8020:8020"
+    mcp_server:
+    depends_on:
+      mongodb:
+        condition: service_healthy   
     networks:
       - anomaly-detection-network
     restart: unless-stopped

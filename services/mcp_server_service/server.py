@@ -11,7 +11,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP('MCP_server')
-mongo_logger = MongoLogger()
+_mongo_logger = None
+
+def get_mongo_logger():
+    global _mongo_logger
+    if _mongo_logger is None:
+        _mongo_logger = MongoLogger()
+    return _mongo_logger
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health(request: Request):
+    return JSONResponse({"status": "ok"})
 
 @mcp.tool()
 def retrieve_context(query: str, machine_id: int):

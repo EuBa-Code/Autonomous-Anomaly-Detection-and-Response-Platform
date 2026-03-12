@@ -225,4 +225,4 @@ ingestion_rag:
 	docker compose up -d --build qdrant ingestion_rag
 
 block_2:
-	docker compose up --build redpanda redpanda-console if_anomaly mongodb vllm mcp_server mcp_client_api langchain_service fakeproducer 
+	docker compose up --build redpanda redpanda-console qdrant mongodb if_anomaly vllm mcp_server mcp_client_api langchain_service fakeproducer 
