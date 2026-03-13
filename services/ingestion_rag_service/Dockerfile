@@ -18,7 +18,7 @@ WORKDIR /ingestion_rag_service
 COPY services/ingestion_rag_service/pyproject.toml services/ingestion_rag_service/uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --group ingestion-rag \
+    uv sync --frozen \
     --index "pytorch-cu126=https://download.pytorch.org/whl/cu126"
 
 COPY services/ingestion_rag_service/ ./

@@ -12,7 +12,7 @@ WORKDIR /if_anomaly_service
 COPY services/if_anomaly_service/pyproject.toml services/if_anomaly_service/uv.lock ./
 
 # No lock file yet, so perform sync without frozen
-RUN uv sync --frozen --no-dev --group if_anomaly
+RUN uv sync --frozen
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \

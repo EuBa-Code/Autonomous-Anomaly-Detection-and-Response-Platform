@@ -6,7 +6,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Cache dependency install before copying source code
 COPY services/retraining_service/pyproject.toml services/retraining_service/uv.lock* ./
-RUN uv sync --frozen --no-dev --group retraining
+RUN uv sync --frozen 
 
 # Copy service source
 COPY services/retraining_service /retraining_service

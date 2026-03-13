@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Python deps
 COPY services/langchain_service/pyproject.toml services/langchain_service/uv.lock ./
-RUN uv sync --frozen --no-dev --group langchain-app
+RUN uv sync --frozen
 
 # Application code
 COPY services/langchain_service/config/ config/

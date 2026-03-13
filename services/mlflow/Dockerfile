@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY services/mlflow/pyproject.toml services/mlflow/uv.lock* ./
-RUN uv sync --frozen --no-dev --group mlflow
+RUN uv sync --frozen
 
 EXPOSE 5000
 

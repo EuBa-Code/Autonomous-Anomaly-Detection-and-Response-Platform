@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY services/streaming_service/pyproject.toml services/streaming_service/uv.lock ./
 
 # Install specific group
-RUN uv sync --frozen --no-dev --group streaming
+RUN uv sync --frozen
 
 # Copy source code and config
 COPY services/streaming_service/src ./src/

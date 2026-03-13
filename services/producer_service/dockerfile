@@ -4,7 +4,7 @@ WORKDIR /producer
 
 COPY services/producer_service/pyproject.toml services/producer_service/uv.lock ./
 
-RUN uv sync --no-dev --group ingestion
+RUN uv sync --frozen
 
 COPY services/producer_service/src ./src/
 COPY services/producer_service/config ./config/

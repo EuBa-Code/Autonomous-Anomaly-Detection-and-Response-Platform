@@ -20,7 +20,7 @@ COPY services/batch_pipeline_service/pyproject.toml services/batch_pipeline_serv
 # 4. Install dependencies
 # We use the new combined group. 
 # We also remove the UV cache immediately to save space.
-RUN uv sync --frozen --no-dev --group spark-services
+RUN uv sync --frozen
 # 5. Copy ALL service code
 
 COPY services/create_datasets_service/ services/create_datasets_service/

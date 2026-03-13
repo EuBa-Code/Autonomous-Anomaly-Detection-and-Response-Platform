@@ -16,7 +16,7 @@ COPY services/mcp_server_service/pyproject.toml services/mcp_server_service/uv.l
 
 # 3. uv sync with cache mount — packages are cached on your host between builds
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --group mcp-server
+    uv sync --frozen
 
 # 4. App code last — changes here don't invalidate the deps layer
 COPY services/mcp_server_service/ ./
