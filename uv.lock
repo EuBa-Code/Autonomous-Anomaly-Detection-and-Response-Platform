@@ -6020,6 +6020,7 @@ mcp-server = [
     { name = "pyyaml" },
     { name = "qdrant-client" },
     { name = "sentence-transformers" },
+    { name = "starlette" },
     { name = "uvicorn" },
 ]
 mcp-server-service = [
@@ -6169,6 +6170,7 @@ mcp-server = [
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "qdrant-client", specifier = ">=1.17.0" },
     { name = "sentence-transformers", specifier = ">=5.2.3" },
+    { name = "starlette", specifier = ">=0.52.1" },
     { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 mcp-server-service = [

@@ -22,36 +22,28 @@ sparse_embeddings_model = FastEmbedSparse(model_name="Qdrant/bm25")
 
 reranker_model = HuggingFaceCrossEncoder(model_name="BAAI/bge-reranker-base")
 
-vector_store = QdrantVectorStore.from_existing_collection(
-        embedding=dense_embeddings_model,  # dense embeddings
-        sparse_embedding=sparse_embeddings_model,  # sparse embeddings
+
+def get_retriever():
+    vector_store = QdrantVectorStore.from_existing_collection(
+        embedding=dense_embeddings_model,
+        sparse_embedding=sparse_embeddings_model,
         url=retrieval_settings.qdrant_url,
         api_key=retrieval_settings.qdrant_api_key,
         prefer_grpc=False,
         collection_name=retrieval_settings.qdrant_collection,
-        retrieval_mode=RetrievalMode.HYBRID  # set hybrid search mode
-)
+        retrieval_mode=RetrievalMode.HYBRID
+    )
+    base_retriever = vector_store.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": 6, "fetch_k": 20}
+    )
+    compressor = FlashrankRerank(
+        client=Ranker(model_name="ms-marco-TinyBERT-L-2-v2", cache_dir="models/flashrank"),
+        top_n=4
+    )
+    return ContextualCompressionRetriever(
+        base_compressor=compressor,
+        base_retriever=base_retriever
+    )
 
-base_retriever = vector_store.as_retriever(  # retriever for step 1 (before reranking)
-        search_type="mmr",  # search technique: MMR (Maximal Marginal Relevance)
-        search_kwargs={
-            "k": 6,  # reselect top 6 based on MMR
-            "fetch_k": 20,  # documents extracted in first step (hybrid search)
-        }
-)
-
-ranker_client = Ranker(  # reranking model
-        model_name="ms-marco-TinyBERT-L-2-v2",  # model name
-        cache_dir="models/flashrank"  # (Optional) Save model here
-)
-
-compressor = FlashrankRerank(
-        client=ranker_client,  # reranker model
-        top_n=4  # top k most relevant documents in output
-)
-
-compression_retriever = ContextualCompressionRetriever(
-        # implements multi-step retrieval pipeline
-        base_compressor=compressor,  # reranking step
-        base_retriever=base_retriever  # base retrieval step (use previously defined retriever)
-)
+compression_retriever = get_retriever()  # still runs at import, but now easier to wrap in try/except

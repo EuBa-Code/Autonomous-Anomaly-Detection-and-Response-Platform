@@ -28,6 +28,12 @@ services:
       - ./redpanda_storage:/var/lib/redpanda/data
     networks:
       - anomaly-detection-network
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health", "--brokers", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   redpanda-console:
     image: docker.redpanda.com/redpandadata/console:latest
@@ -35,20 +41,14 @@ services:
     ports:
       - "8080:8080"
     environment:
-    KAFKA_BROKERS: redpanda:9092
-      KAFKA_SCHEMAREGISTRY_ENABLED: "true"
-      KAFKA_SCHEMAREGISTRY_URLS: http://redpanda:8081
+      - KAFKA_BROKERS=redpanda:9092
+      - KAFKA_SCHEMAREGISTRY_ENABLED="true"
+      - KAFKA_SCHEMAREGISTRY_URLS=http://redpanda:8081
     depends_on:
       redpanda:
-        condition: service_started
+        condition: service_healthy
     networks:
       - anomaly-detection-network
-    healthcheck:
-      test: ["CMD", "rpk", "cluster", "health", "--brokers", "localhost:9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
 
   # ============================================================================
   # REDPANDA INIT - Create Topics
@@ -58,7 +58,7 @@ services:
     container_name: redpanda_init
     depends_on:
       redpanda:
-        condition: service_started
+        condition: service_healthy
     entrypoint: [ "/bin/bash", "-c" ]
     command:
       - |
@@ -267,7 +267,7 @@ services:
     # profiles: [ "simulation" ]
     depends_on:
       redpanda:
-        condition: service_started
+        condition: service_healthy
     environment:
       - PYTHONUNBUFFERED=1
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
@@ -349,7 +349,7 @@ services:
     profiles: [ "online" ]
     depends_on:
       redpanda:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
@@ -562,7 +562,7 @@ services:
     container_name: fakeproducer
     depends_on:
       redpanda:
-        condition: service_started
+        condition: service_healthy
     command: [ "-m", "src.fakeproducer" ]
     environment:
       - PYTHONPATH=/if_anomaly_service
@@ -609,6 +609,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - MODE=both                         # REST + FastMCP SSE on same port
+      - QDRANT_COLLECTION=ingestion_rag_service  
     ports:
       - "8020:8020"
     depends_on:
@@ -621,8 +622,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8020/health"]
       interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 40s                   # cross-encoder model load takes time
+      retries: 2
+      start_period: 600s                   # cross-encoder model load takes time
 
   # ============================================================================
   # MCP CLIENT API - LangGraph agent (Tools → Agent → Thread)

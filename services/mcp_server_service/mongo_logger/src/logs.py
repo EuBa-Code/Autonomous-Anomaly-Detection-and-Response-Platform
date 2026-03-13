@@ -2,7 +2,7 @@ from pymongo import MongoClient
 from datetime import datetime, timezone
 import os
 
-from mongodb.config import retrieval_settings
+from mongo_logger.config import retrieval_settings
 
 class MongoLogger:
     def __init__(self):

@@ -1,7 +1,8 @@
 from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 from qdrant.src import compression_retriever, format_docs
-from mongodb.src import MongoLogger
-
+from mongo_logger.src import MongoLogger
 import logging
 
 logging.basicConfig(
@@ -25,20 +26,17 @@ async def health(request: Request):
 
 @mcp.tool()
 def retrieve_context(query: str, machine_id: int):
-
     try:
         retrieved_docs = compression_retriever.invoke(query)
         formatted_docs = format_docs(retrieved_docs)
     except Exception as e:
-        logging.error(f"Error while retrieving documents with Qdrant, error: {e}")        
+        logging.error(f"Error retrieving documents: {e}")
         return f'Error retrieving context with Qdrant: {e}'
 
     try:
-        mongo_logger.log_query(
-            machine_id = machine_id
-        )
+        get_mongo_logger().log_query(machine_id=machine_id)  # fixed
     except Exception as e:
-        logging.error(f"Error while saving logs with MongoDB, error: {e}")        
+        logging.error(f"Error saving logs: {e}")
         return f'Error saving logs with MongoDB: {e}'
 
     return formatted_docs
