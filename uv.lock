@@ -6021,7 +6021,8 @@ mcp-server = [
     { name = "qdrant-client" },
     { name = "sentence-transformers" },
     { name = "starlette" },
-    { name = "uvicorn" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "websockets" },
 ]
 mcp-server-service = [
     { name = "confluent-kafka" },
@@ -6171,7 +6172,8 @@ mcp-server = [
     { name = "qdrant-client", specifier = ">=1.17.0" },
     { name = "sentence-transformers", specifier = ">=5.2.3" },
     { name = "starlette", specifier = ">=0.52.1" },
-    { name = "uvicorn", specifier = ">=0.34.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0" },
+    { name = "websockets", specifier = ">=16.0" },
 ]
 mcp-server-service = [
     { name = "confluent-kafka", specifier = ">=2.11.1" },
