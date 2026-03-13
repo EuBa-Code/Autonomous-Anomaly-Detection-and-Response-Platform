@@ -2,6 +2,7 @@ services:
   # ============================================================================
   # REDPANDA - Message Broker (Kafka-compatible)
   # ============================================================================
+  
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:latest
     container_name: redpanda_broker
@@ -20,39 +21,21 @@ services:
       - --default-log-level=info
       - --overprovisioned
     ports:
-      - "18081:18081" # Schema Registry
-      - "18082:18082" # Pandaproxy
-      - "19092:19092" # Kafka API (external)
-      - "19644:9644" # Admin API
+      - "18081:18081"
+      - "18082:18082"
+      - "19092:19092"
+      - "19644:9644"
     volumes:
       - ./redpanda_storage:/var/lib/redpanda/data
     networks:
       - anomaly-detection-network
     healthcheck:
-      test: ["CMD", "rpk", "cluster", "health", "--brokers", "localhost:9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+      test: ["CMD-SHELL", "curl -sf http://localhost:9644/v1/status/ready && rpk cluster health --brokers localhost:9092 | grep -q 'Healthy:.*true' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15           
+      start_period: 45s
 
-  redpanda-console:
-    image: docker.redpanda.com/redpandadata/console:latest
-    container_name: redpanda_console
-    ports:
-      - "8080:8080"
-    environment:
-      - KAFKA_BROKERS=redpanda:9092
-      - KAFKA_SCHEMAREGISTRY_ENABLED="true"
-      - KAFKA_SCHEMAREGISTRY_URLS=http://redpanda:8081
-    depends_on:
-      redpanda:
-        condition: service_healthy
-    networks:
-      - anomaly-detection-network
-
-  # ============================================================================
-  # REDPANDA INIT - Create Topics
-  # ============================================================================
   redpanda-init:
     image: docker.redpanda.com/redpandadata/redpanda:latest
     container_name: redpanda_init

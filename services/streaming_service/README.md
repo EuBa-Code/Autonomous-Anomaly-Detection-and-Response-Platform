@@ -1,148 +1,105 @@
-# Streaming Service — Real-Time Feature Engineering with Quix Streams
+# Streaming Service
 
-## Role in the Architecture
+## Overview
 
-The Streaming Service is the **real-time processing backbone** of the anomaly detection system. It consumes raw telemetry from Redpanda, applies feature engineering and normalization, pushes features to Redis via Feast, and publishes processed data for downstream consumers.
+Real-time transformation and feature ingestion service. It consumes raw telemetry from Redpanda, persists a ground-truth raw sink for the batch pipeline, computes two sliding-window feature aggregations, and pushes each window's output directly to the Feast feature server — which writes to both Redis (online store) and Parquet backfill (offline store) in a single HTTP call.
+
+## File Structure
 
 ```
-┌──────────────┐   telemetry-data   ┌─────────────────────────────────────────┐
-│   Redpanda   │ ─────────────────▸ │         Streaming Service (Quix)        │
-│   (Kafka)    │                    │                                         │
-└──────────────┘                    │  1. Consume raw telemetry               │
-                                    │  2. Feature engineering (rolling aggs)  │
-                                    │  3. Normalize with pre-trained Scaler   │
-                                    │  4. Push features to Redis (Feast)      │
-                                    │  5. Produce to processed-telemetry      │
-                                    │                                         │
-                                    └────────────┬──────────────┬─────────────┘
-                                                 │              │
-                                    ┌────────────▼──┐    ┌──────▼──────────┐
-                                    │    Redis      │    │    Redpanda     │
-                                    │ (Online Store)│    │ processed-topic │
-                                    └───────────────┘    └─────────────────┘
+services/streaming_service/
+├── dockerfile
+├── config/
+│   └── config.py           # All settings via environment variables
+└── src/
+    └── app.py              # Full pipeline: sink + derived feature + two windows + Feast push
 ```
 
-## Technology: Quix Streams
+> `feature_store.yaml` is copied from `services/feature_store_service/src/` at build time so the streaming service shares the same Feast project definition.
 
-[Quix Streams](https://github.com/quixio/quix-streams) is a Python-native stream processing library designed for real-time data pipelines. It provides a Pandas-like API on top of Kafka consumers/producers.
+## Pipeline
 
-### Why Quix Streams over other options
-
-| Alternative | Trade-off |
-|-------------|-----------|
-| **Apache Flink** | JVM-based, heavy infrastructure, overkill for single-service processing |
-| **Kafka Streams** | JVM-only, no Python support |
-| **Raw confluent-kafka** | Low-level — requires manual serialization, offset management, error handling |
-| **Apache Spark Streaming** | Heavy runtime, high memory footprint, designed for cluster-scale |
-| **Quix Streams** ✅ | Python-native, lightweight, built-in JSON serde, exactly-once semantics, minimal boilerplate |
-
-## Processing Pipeline (`src/app.py`)
-
-```python
-# 1. Initialize Quix application connected to Redpanda
-app = Application(broker_address="redpanda:9092", ...)
-
-# 2. Define input/output topics
-input_topic  = app.topic("telemetry-data", value_deserializer="json")
-output_topic = app.topic("processed-telemetry", value_serializer="json")
-
-# 3. Create streaming dataframe
-sdf = app.dataframe(input_topic)
-
-# 4. Apply transformation (for each message):
-#    a. Compute rolling window aggregations
-#    b. Normalize using pre-trained preprocessor (joblib artifact)
-#    c. Push to Feast Online Store (Redis)
-#    d. Return enriched feature vector
-sdf = sdf.apply(process_and_push)
-
-# 5. Publish to output topic
-sdf = sdf.to_topic(output_topic)
-
-# 6. Run the pipeline
-app.run(sdf)
+```
+Redpanda  →  telemetry-data topic
+        │
+        │  timestamp_extractor (event-time, not broker-time)
+        │
+        ├─► raw sink  →  LocalFileSink  →  /data/entity_df  (Parquet)
+        │                (ground-truth for retraining point-in-time joins)
+        │
+        ├─► compute Current_Imbalance_Ratio  (per record, before windowing)
+        │       = (max(L1,L2,L3) − min(L1,L2,L3)) / mean(L1,L2,L3)
+        │
+        ├─► 10-min sliding window  (grace: 2 min)
+        │       agg: Vibration_RollingMax_10min = Max(Vibration_mm_s)
+        │            Machine_ID, latest_timestamp = Latest()
+        │       → POST /push  →  vibration_push_source  →  Feast (Redis + Parquet)
+        │
+        └─► 5-min sliding window  (grace: 2 min)
+                agg: Current_Imbalance_RollingMean_5min = Mean(Current_Imbalance_Ratio)
+                     Current_Imbalance_Ratio = Latest()
+                     Machine_ID, latest_timestamp = Latest()
+                → POST /push  →  current_push_source  →  Feast (Redis + Parquet)
 ```
 
-### Message Flow
+## Key Design Decisions
 
-**Input** (`telemetry-data` topic):
+**Two push sources, no stateful merge** — each window pushes only its own fields to its own dedicated `PushSource`. This eliminates partial/`None` records that would arise from trying to merge two windows of different lengths into a single push.
+
+**Raw sink before transformation** — every message is written to `/data/entity_df` in its original form *before* any feature computation. These files are the authoritative ground-truth used by the retraining service for Feast point-in-time joins.
+
+**Event-time windowing** — `timestamp_extractor` reads the `timestamp` field embedded in the Kafka payload rather than the broker timestamp. This ensures sliding windows are correctly aligned even when messages arrive slightly late.
+
+**`PUSH_TO = online_and_offline`** — each Feast push writes to both Redis (for real-time inference) and the Parquet backfill path (for historical retrieval). Set to `online` in local development to skip the Parquet write.
+
+## Feast Push Payloads
+
+### `vibration_push_source` (10-min window)
 ```json
 {
-  "Machine_ID": "WM_001",
-  "timestamp": "2024-01-15 10:30:00",
-  "Current_L1": 12.5,
-  "Voltage_L_L": 400.2,
-  "Vibration_mm_s": 3.8,
-  "Water_Temp_C": 45.0,
-  ...
+  "Machine_ID": 1,
+  "timestamp": "2024-01-15T10:30:00+00:00",
+  "Vibration_RollingMax_10min": 8.73
 }
 ```
 
-**Output** (`processed-telemetry` topic):
+### `current_push_source` (5-min window)
 ```json
 {
-  "Machine_ID": "WM_001",
-  "timestamp": "2024-01-15 10:30:00",
-  "features": [0.23, -0.45, 1.12, ...],
-  "raw_data": { ... }
+  "Machine_ID": 1,
+  "timestamp": "2024-01-15T10:30:00+00:00",
+  "Current_Imbalance_Ratio": 0.031,
+  "Current_Imbalance_RollingMean_5min": 0.027
 }
 ```
 
-## Artifacts Required
+## Configuration (`config.py`)
 
-| Artifact | Source | Path in Container |
-|----------|--------|--------------------|
-| `preprocessor.joblib` | Training Service | `/streaming_service/data/models/preprocessor.joblib` |
-| `feature_store.yaml` | Feature Store Config | `/streaming_service/feature_store.yaml` |
-| Feast Registry | Feature Store Apply | `/app/data/registry/registry.db` |
+| Variable | Default | Description |
+|---|---|---|
+| `KAFKA_BOOTSTRAP_SERVERS` | `redpanda:9092` | Redpanda broker |
+| `TOPIC_TELEMETRY` | `telemetry-data` | Input topic |
+| `AUTO_OFFSET_RESET` | `latest` | Start from latest on first run |
+| `FEAST_SERVER_URL` | `http://feature_store_service:6566` | Feast HTTP server |
+| `PUSH_SOURCE_VIBRATION` | `vibration_push_source` | Push source name for 10-min window |
+| `PUSH_SOURCE_CURRENT` | `current_push_source` | Push source name for 5-min window |
+| `FEAST_PUSH_TO` | `online_and_offline` | Write target (`online` / `online_and_offline`) |
+| `QUIX_STATE_DIR` | `/tmp/quix_state` | RocksDB state directory for QuixStreams |
+| `ENTITY_DF_DIR` | `/data/entity_df` | Raw sink output directory |
+| `ENTITY_DF_FORMAT` | `parquet` | Raw sink file format |
 
-## Docker Configuration
+## Startup Behaviour
 
-```yaml
-# compose.yaml
-streaming_service:
-  build:
-    context: .
-    dockerfile: services/streaming_service/dockerfile
-  depends_on:
-    redpanda:
-      condition: service_started
-  environment:
-    - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
-    - FEAST_REPO_PATH=/streaming_service
-  volumes:
-    - ./data/models:/streaming_service/data/models:ro    # Pre-trained preprocessor
-    - ./data/registry:/app/data/registry                 # Feast registry
-```
+`FeastPusher.wait_until_ready()` blocks for up to 120 seconds polling `GET /health` on the Feast server before the pipeline starts. This prevents push failures during the brief window after Feast starts but before it finishes loading the registry.
 
-## Dependency Group
-
-Defined in `pyproject.toml` under `[dependency-groups] streaming`:
-
-```toml
-streaming = [
-    "quixstreams>=3.0.0",
-    "pandas>=2.2.0",
-    "scikit-learn>=1.5.0",
-    "joblib>=1.4.0",
-    "feast[redis]>=0.58.0",
-    "python-dotenv>=1.0.0",
-]
-```
-
-## Running
+## Build & Run
 
 ```bash
-# Via Docker Compose
-make streaming
+# Build
+docker build -f services/streaming_service/dockerfile -t streaming_service:latest .
 
-# Or directly
-docker compose up --build streaming_service
+# Run
+docker compose --profile online up streaming_service
 ```
 
-## Monitoring
-
-Check the Redpanda Console at `http://localhost:8080` to monitor:
-- **`telemetry-data`** topic — incoming raw messages
-- **`processed-telemetry`** topic — outgoing processed features
-- Consumer group lag for `quix-streaming-processor-v1`
+Depends on `redpanda` (healthy) and `feature_store_service` (healthy) being up before meaningful data flows.
