@@ -6003,25 +6003,19 @@ langchain-app = [
     { name = "uvicorn" },
 ]
 mcp-server = [
-    { name = "fastapi" },
     { name = "fastembed" },
     { name = "fastmcp" },
     { name = "flashrank" },
-    { name = "langchain" },
     { name = "langchain-classic" },
     { name = "langchain-community" },
     { name = "langchain-core" },
-    { name = "langchain-google-genai" },
     { name = "langchain-huggingface" },
     { name = "langchain-qdrant" },
-    { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pymongo" },
     { name = "pyyaml" },
-    { name = "qdrant-client" },
     { name = "sentence-transformers" },
     { name = "starlette" },
-    { name = "uvicorn" },
 ]
 mcp-server-service = [
     { name = "confluent-kafka" },
@@ -6153,25 +6147,19 @@ langchain-app = [
     { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 mcp-server = [
-    { name = "fastapi", specifier = ">=0.129.0" },
     { name = "fastembed", specifier = ">=0.7.4" },
     { name = "fastmcp", specifier = ">=2.13.0.2" },
     { name = "flashrank", specifier = ">=0.2.10" },
-    { name = "langchain", specifier = ">=1.2.10" },
     { name = "langchain-classic", specifier = ">=1.0.1" },
     { name = "langchain-community", specifier = ">=0.4.1" },
     { name = "langchain-core", specifier = ">=1.2.15" },
-    { name = "langchain-google-genai", specifier = ">=2.1.12" },
     { name = "langchain-huggingface", specifier = ">=1.2.1" },
     { name = "langchain-qdrant", specifier = ">=1.1.0" },
-    { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pydantic-settings", specifier = ">=2.11.0" },
     { name = "pymongo", specifier = ">=4.16.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "qdrant-client", specifier = ">=1.17.0" },
     { name = "sentence-transformers", specifier = ">=5.2.3" },
     { name = "starlette", specifier = ">=0.52.1" },
-    { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 mcp-server-service = [
     { name = "confluent-kafka", specifier = ">=2.11.1" },
