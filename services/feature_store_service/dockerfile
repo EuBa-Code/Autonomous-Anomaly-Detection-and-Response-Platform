@@ -17,7 +17,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency definition files to the working directory
-COPY pyproject.toml uv.lock ./
+COPY services/feature_store_service/pyproject.toml services/feature_store_service/uv.lock ./
 
 RUN uv sync --frozen --no-dev --group feature-store 
 

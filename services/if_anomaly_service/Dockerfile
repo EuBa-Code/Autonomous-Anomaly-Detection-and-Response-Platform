@@ -9,7 +9,7 @@ WORKDIR /if_anomaly_service
 
 # Install dependencies FIRST (caching layer)
 # Copy service-specific pyproject.toml
-COPY pyproject.toml uv.lock ./
+COPY services/if_anomaly_service/pyproject.toml services/if_anomaly_service/uv.lock ./
 
 # No lock file yet, so perform sync without frozen
 RUN uv sync --frozen --no-dev --group if_anomaly

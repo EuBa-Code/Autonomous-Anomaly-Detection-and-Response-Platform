@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 WORKDIR /producer
 
-COPY pyproject.toml uv.lock ./
+COPY services/producer_service/pyproject.toml services/producer_service/uv.lock ./
 
 RUN uv sync --no-dev --group ingestion
 

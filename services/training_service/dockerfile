@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 WORKDIR /training_service
 
-COPY pyproject.toml uv.lock* ./
+COPY services/training_service/pyproject.toml services/training_service/uv.lock* ./
 
 RUN uv sync --frozen --no-dev --group training
 

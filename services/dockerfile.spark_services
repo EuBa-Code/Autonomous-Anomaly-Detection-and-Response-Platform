@@ -15,7 +15,7 @@ ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 WORKDIR /app
 
 # 3. Copy dependency definitions
-COPY pyproject.toml uv.lock ./
+COPY services/batch_pipeline_service/pyproject.toml services/batch_pipeline_service/uv.lock ./
 
 # 4. Install dependencies
 # We use the new combined group. 

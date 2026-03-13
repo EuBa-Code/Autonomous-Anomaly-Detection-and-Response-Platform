@@ -9,7 +9,7 @@ WORKDIR /inference_service
 
 # Install dependencies FIRST (caching layer)
 # Copy service-specific pyproject.toml
-COPY pyproject.toml uv.lock ./
+COPY services/inference_service/pyproject.toml services/inference_service/uv.lock ./
 
 # No lock file yet, so perform sync without frozen
 RUN uv sync --frozen --no-dev --group inference

@@ -12,7 +12,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Copy only dependency files — this layer is cached until they change
-COPY pyproject.toml uv.lock ./
+COPY services/mcp_server_service/pyproject.toml services/mcp_server_service/uv.lock ./
 
 # 3. uv sync with cache mount — packages are cached on your host between builds
 RUN --mount=type=cache,target=/root/.cache/uv \

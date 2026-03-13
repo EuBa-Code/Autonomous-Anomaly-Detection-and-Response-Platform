@@ -15,7 +15,7 @@ RUN apt-get update \
 ENV PATH="/root/.local/bin:$PATH"
 
 WORKDIR /ingestion_rag_service
-COPY pyproject.toml uv.lock ./
+COPY services/ingestion_rag_service/pyproject.toml services/ingestion_rag_service/uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --group ingestion-rag \
