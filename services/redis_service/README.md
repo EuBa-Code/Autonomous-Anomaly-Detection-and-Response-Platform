@@ -1,81 +1,55 @@
-# Redis — Online Feature Store
+# Redis Service
 
-## Role in the Architecture
+## Overview
 
-Redis serves as the **Online Feature Store** for the anomaly detection system. It provides sub-millisecond access to the latest feature values, enabling real-time inference on incoming telemetry data.
+Custom Redis image configured as the **Feast online store** — the low-latency key-value backend that serves pre-computed features to the inference pipeline at scoring time. Persistence is intentionally disabled: Redis holds only the current feature values, which are repopulated from the offline Parquet store via `feast materialize` or streaming pushes.
+
+## File Structure
 
 ```
-┌──────────────┐     push      ┌───────────┐     get_online_features()     ┌───────────────┐
-│  Streaming   │ ─────────────▸│   Redis   │◂──────────────────────────── │   Inference   │
-│   Service    │   (via Feast) │  (Online  │         (via Feast)          │   Service     │
-│  (Quix)      │               │   Store)  │                              │               │
-└──────────────┘               └───────────┘                              └───────────────┘
-       ▲                             ▲
-       │                             │
-       │                     materialize()
-       │                             │
-┌──────────────┐              ┌──────────────┐
-│   Redpanda   │              │   Feature    │
-│   (Kafka)    │              │   Loader     │
-└──────────────┘              └──────────────┘
+services/redis_service/
+├── Dockerfile
+└── config/
+    └── redis.conf
 ```
 
-## How It Works
+## Base Image
 
-1. **Feature Loader** runs `feast materialize()` to bulk-load historical features from Parquet → Redis
-2. **Streaming Service** pushes real-time features via `store.push()` using Feast's PushSource API
-3. **Inference Service** reads the latest feature vector via `store.get_online_features()` for prediction
-
-## Configuration
-
-### `config/redis.conf`
-
-| Setting | Value | Rationale |
-|---------|-------|-----------|
-| `save ""` | Persistence disabled | Features are recomputable from source data — no need for disk persistence |
-| `appendonly no` | AOF disabled | Same rationale — reduces I/O overhead |
-| `maxmemory 512mb` | Memory cap | Prevents Redis from consuming all host memory |
-| `maxmemory-policy allkeys-lru` | LRU eviction | When memory is full, evict least-recently-used keys first |
-| `bind 0.0.0.0` | Listen on all interfaces | Required for Docker container networking |
-
-### Feast Integration
-
-Redis is configured as the online store in `feature_store_service/config/feature_store.yaml`:
-
-```yaml
-online_store:
-  type: redis
-  connection_string: "redis:6379"
-  key_ttl_seconds: 86400   # Features expire after 24 hours
+```
+redis:6.2-alpine
 ```
 
-## Docker
+## Configuration (`redis.conf`)
 
-```yaml
-# compose.yaml
-redis:
-  build:
-    context: ./services/redis_service
-    dockerfile: Dockerfile
-  container_name: redis_online_store
-  ports:
-    - "6379:6379"
-  healthcheck:
-    test: ["CMD", "redis-cli", "ping"]
-    interval: 10s
-    timeout: 5s
-    retries: 5
+| Setting | Value | Reason |
+|---|---|---|
+| `save ""` | Persistence disabled | Online feature store — data is always re-materialized from offline store on restart |
+| `appendonly no` | AOF disabled | No write-ahead log needed for ephemeral feature cache |
+| `maxmemory` | `512mb` | Hard cap to protect the host from OOM |
+| `maxmemory-policy` | `allkeys-lru` | Evict the least-recently-used keys when the cap is reached — keeps the freshest features in memory |
+| `port` | `6379` | Standard Redis port |
+| `bind` | `0.0.0.0` | Accessible from all containers on the Docker network |
+
+## Role in the System
+
+```
+feast materialize  ──►  Redis  ◄──  streaming push (per window)
+                           │
+                           ▼
+                    inference service
+                    GET /get-online-features
 ```
 
-The healthcheck ensures downstream services (Feast, Streaming) only start after Redis is fully operational.
+Features enter Redis from two directions: the Airflow-triggered `feast materialize-incremental` (batch) and the streaming service's `POST /push` calls (real-time). The inference service reads them via the Feast HTTP server at `redis:6379`.
 
-## Monitoring
-
-Connect to Redis from the host:
+## Build & Run
 
 ```bash
-redis-cli -p 6379
-> INFO memory          # Check memory usage
-> DBSIZE              # Count of stored keys
-> KEYS feast:*        # List Feast-managed keys
+# Build
+docker build -f services/redis_service/Dockerfile -t redis_online_store:latest .
+
+# Run
+docker compose up redis
 ```
+
+RedisInsight is available at `http://localhost:5540` for inspecting stored feature keys during development.
