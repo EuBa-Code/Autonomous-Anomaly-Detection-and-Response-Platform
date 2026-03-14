@@ -21,4 +21,5 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # 4. App code last — changes here don't invalidate the deps layer
 COPY services/mcp_server_service/ ./
 
-CMD ["uv", "run", "-m", "server"]
+ENV PATH="/mcp_server_service/.venv/bin:$PATH"
+CMD ["python", "-m", "server"]

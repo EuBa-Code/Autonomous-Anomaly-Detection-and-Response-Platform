@@ -206,9 +206,10 @@ test-inference:
 		redpanda-init \
 		mlflow \
 		feature_store_service \
-		cold_start \
-		streaming_service \
 		inference_service \
+		streaming_service \
+		create_offline_files \
+		cold_start \
 		producer_service
 	@echo ""
 	@echo "Redpanda console : http://localhost:8080"
@@ -217,7 +218,7 @@ test-inference:
 
 down-inference:
 	docker compose --profile online down \
-		redis redpanda redpanda-console redpanda-init mlflow \
+		redis redis-insight redpanda redpanda-console redpanda-init mlflow \
 		feature_store_service streaming_service inference_service producer_service
 
 
@@ -225,4 +226,41 @@ ingestion_rag:
 	docker compose up -d --build qdrant ingestion_rag
 
 block_2:
-	docker compose up --build redpanda redpanda-console qdrant mongodb if_anomaly vllm mcp_server langchain_service 
+	docker compose up --build redpanda redpanda-console qdrant mongodb if_anomaly vllm mcp_server langchain_service \
+
+
+full_datasets:
+	docker compose up --build \
+		create_datasets \
+		data_engineering
+
+full_architecture:
+	@echo "  🚀 Full Architecture (WITH Airflow)"
+	docker compose up \
+		redis \
+		redpanda \
+		redpanda-console \
+		redpanda-init \
+		mlflow \
+		qdrant \
+		mongodb \
+		postgres_airflow \
+		airflow-init \
+		airflow-webserver \
+		airflow-scheduler \
+		feature_store_apply \
+		feature_store_service \
+		streaming_service \
+		inference_service \
+		ingestion_rag \
+		mcp_server \
+		vllm \
+		langchain_service \
+		if_anomaly 
+		
+cold_start:
+	docker compose up --build cold_start
+
+full_data_flow:
+	docker compose up \
+		producer_service

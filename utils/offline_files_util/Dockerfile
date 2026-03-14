@@ -6,10 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # Install dependencies FIRST (caching layer)
 # Copy service-specific pyproject.toml
-COPY pyproject.toml uv.lock ./
+COPY utils/offline_files_util/pyproject.toml utils/offline_files_util/uv.lock ./
 
 # No lock file yet, so perform sync without frozen
-RUN uv sync --frozen --no-dev --group offline-files
+RUN uv sync --frozen 
 
 COPY utils/offline_files_util/create_offline_files.py/ ./
 COPY services/inference_service/config/ config/

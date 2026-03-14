@@ -39,18 +39,12 @@ services:
       KAFKA_BROKERS: redpanda:9092
       KAFKA_SCHEMAREGISTRY_ENABLED: "true"
       KAFKA_SCHEMAREGISTRY_URLS: http://redpanda:8081
-    depends_on:
-      redpanda:
-        condition: service_started
     networks:
       - anomaly-detection-network
 
   redpanda-init:
     image: docker.redpanda.com/redpandadata/redpanda:latest
     container_name: redpanda_init
-    depends_on:
-      redpanda:
-        condition: service_healthy
     entrypoint: [ "/bin/bash", "-c" ]
     command:
       - |
@@ -108,7 +102,7 @@ services:
     volumes:
       - ./data/registry:/data/registry
       - ./data/offline:/data/offline
-      - ./services/feature_store_service/src:/feature_store_service/src:ro
+      - ./services/feature_store_service/src:/feature_store_service/src
     command: [ "uv", "run", "feast", "apply" ]
     networks:
       - anomaly-detection-network
@@ -133,18 +127,13 @@ services:
     volumes:
       - ./data/registry:/data/registry
       - ./data/offline:/data/offline
-      - ./services/feature_store_service/src:/feature_store_service/src:ro
+      - ./services/feature_store_service/src:/feature_store_service/src
     ports:
       - "8000:6566"
     networks:
       - anomaly-detection-network
     command: [ "uv", "run", "feast", "serve", "--host", "0.0.0.0", "--port", "6566" ]
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6566/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
 
   # ============================================================================
   # DATA GENERATION & PROCESSING SERVICES
@@ -337,8 +326,6 @@ services:
     container_name: streaming_service
     profiles: [ "online" ]
     depends_on:
-      redpanda:
-        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
