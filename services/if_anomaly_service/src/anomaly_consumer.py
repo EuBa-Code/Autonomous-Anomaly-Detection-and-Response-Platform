@@ -90,7 +90,7 @@ def trigger_mcp_investigation(message: dict):
     }
     try:
         with httpx.Client(timeout=30) as client:
-            r = client.post(f"{Config.MCP_CLIENT_URL}/chat/stream", json=payload)
+            r = client.post(f"{Config.MCP_API_URL}/chat/stream", json=payload)
             r.raise_for_status()
         logger.info("Investigation triggered successfully.")
     except Exception as e:

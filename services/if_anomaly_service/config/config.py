@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     
     # MCP Client API
     # Assuming the MCP client is another service in the same network
-    MCP_API_URL: str = "http://mcp_client:8000"
+    MCP_API_URL: str = "http://langchain_service:8010"
     CONSUMER_GROUP: str = 'if-anomaly-group'
 
 Config = Settings()

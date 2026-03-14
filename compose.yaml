@@ -533,7 +533,7 @@ services:
     environment:
       - PYTHONPATH=/if_anomaly_service
       - LOG_LEVEL=INFO
-      - MCP_CLIENT_URL=http://langchain_service:8010   
+      - MCP_API_URL=http://langchain_service:8010   
       - REDPANDA_BROKERS=redpanda:9092
       - PREDICTIONS_TOPIC=predictions
     networks:
