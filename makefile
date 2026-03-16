@@ -236,7 +236,8 @@ init:
 full_datasets:
 	docker compose up --build \
 		create_datasets \
-		data_engineering
+		data_engineering \
+		create_offline_files
 
 first_training:
 	docker compose up --build --abort-on-container-exit training_service 
