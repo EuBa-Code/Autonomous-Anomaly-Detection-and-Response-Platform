@@ -13,7 +13,7 @@ class Config:
     # ── Redpanda / Kafka ──────────────────────────────────────────────────────
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "redpanda:9092")
     CONSUMER_GROUP:          str = os.getenv("CONSUMER_GROUP", "inference-pipeline-v1")
-    AUTO_OFFSET_RESET:       str = os.getenv("AUTO_OFFSET_RESET", "earliest")
+    AUTO_OFFSET_RESET:       str = os.getenv("AUTO_OFFSET_RESET", "latest")
 
     # Input  : raw telemetry produced by producer.py
     TOPIC_INPUT:  str = os.getenv("TOPIC_INPUT",  "telemetry-data")

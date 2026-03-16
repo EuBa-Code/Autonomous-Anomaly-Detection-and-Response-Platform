@@ -83,7 +83,7 @@ def trigger_mcp_investigation(message: dict):
         "machine_id": machine_id,
         "message": (
             f"Investigate anomaly for machine {machine_id}. "
-            f"Score: {message.get('anomaly_score'):.3f}. "
+            f"Score: {message.get('anomaly_score', 0.0):.3f}. "
             f"Features: {message.get('features')}"
         )
     }
@@ -117,6 +117,9 @@ def main() -> None:
 
     # 1. Filter the stream: Only keep records where is_anomaly is 1
     # This replaces the 'if sdf["is_anomaly"] == 1:' block
+    sdf = sdf[sdf.apply(lambda row: "is_anomaly" in row)]
+
+    # 2. Now it is safe to filter by the value
     sdf = sdf[sdf['is_anomaly'] == 1]
 
     # 2. Execute the action for every anomaly found

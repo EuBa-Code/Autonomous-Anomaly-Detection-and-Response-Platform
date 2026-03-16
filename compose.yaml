@@ -226,7 +226,6 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
-      - STREAMING_DATASET=industrial_washer_normal_streaming
     volumes:
       - ./data/synthetic_datasets:/producer/data/streaming_data:ro
     networks:
