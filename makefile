@@ -277,6 +277,18 @@ full_data_flow:
 # sudo chown -R 101:101 ./redpanda_storage
 
 clean_data:
-	sudo rm -rf data/offline/streaming_backfill && sudo rm -rf data/entity_df/telemetry_0 && docker compose up create_offline_files && \
-	docker exec -it redpanda-broker rpk topic delete predictions && \
-	docker exec -it redpanda-broker rpk topic delete telemtry-data \
+
+	docker compose stop inference_service streaming_service || true
+
+	sudo rm -rf data/offline/streaming_backfill
+	sudo rm -rf data/entity_df/telemetry_data
+	sudo rm -rf /tmp/quix_state/
+	sudo rm -rf /inference_service/state/
+
+	docker compose up create_offline_files
+	docker exec -it redpanda_broker rpk topic delete telemetry-data predictions || true
+	docker exec -it redpanda_broker rpk topic create telemetry-data -p 1 -r 1
+	docker exec -it redpanda_broker rpk topic create predictions -p 1 -r 1
+
+	docker compose start inference_service streaming_service
+	
