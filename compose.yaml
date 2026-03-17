@@ -145,6 +145,8 @@ services:
         condition: service_healthy
       feature_store_apply:
         condition: service_completed_successfully
+      create_offline_files:
+        condition: service_completed_succesfully
     networks:
       - anomaly-detection-network
     command: [ "uv", "run", "feast", "serve", "--host", "0.0.0.0", "--port", "6566" ]
@@ -233,6 +235,9 @@ services:
     container_name: offline_files_util
     volumes:
       - ./data:/data
+    depends_on:
+      create_offline_files:
+        condition: service_completed_succesfully
     networks:
       - anomaly-detection-network
     restart: "no" 
