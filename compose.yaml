@@ -144,8 +144,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      feature_store_apply:
-        condition: service_completed_successfully
       create_offline_files:
         condition: service_completed_successfully
     networks:
@@ -455,6 +453,12 @@ services:
         condition: service_healthy
       feature_store_service:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s = socket.socket(); s.connect(('localhost', 8000))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -608,7 +612,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-admin}
       MONGO_INITDB_DATABASE: anomaly_reports
     healthcheck:
-      test: ["CMD", "mongosh", "--exec", "db.adminCommand('ping')", "localhost:27017/test", "--quiet"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "localhost:27017/test", "--quiet"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -647,10 +651,6 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-      qdrant:
-        condition: service_healthy
-      ingestion_rag:
-        condition: service_completed_successfully
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -671,12 +671,6 @@ services:
     volumes:
       - ./services/mcp_server_service/qdrant/config/qdrant_config.yaml:/qdrant/config/production.yaml 
       - ./qdrant_data:/qdrant/storage
-    healthcheck:  
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
     networks:
       - anomaly-detection-network
 
@@ -696,9 +690,6 @@ services:
     volumes:
       - ./rag_files:/ingestion_rag_service/rag_files:ro
       - ./local_models:/ingestion_rag_service/models    
-    depends_on:
-      qdrant:
-        condition: service_healthy
     networks:
       - anomaly-detection-network
       
