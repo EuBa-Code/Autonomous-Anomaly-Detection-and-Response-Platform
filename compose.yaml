@@ -357,6 +357,7 @@ services:
       # Feast Registry and Configuration
       - ./data/registry:/data/registry:ro
       - ./services/feature_store_service/src/feature_store.yaml:/inference_service/feature_store.yaml:ro
+      - ./outputs:/inference_service/outputs:ro
     ports:
       - "8001:8000"
     networks:

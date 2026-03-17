@@ -16,6 +16,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from typing import Any
+import json
 
 import mlflow
 import mlflow.sklearn
@@ -151,26 +152,33 @@ def build_x(features: dict[str, Any], feature_columns: list[str]) -> pd.DataFram
     return x
 
 
+def load_thresholds(filepath: str = "outputs/thresholds.json") -> dict:
+    try:
+        with open(filepath, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        logger.error("File thresholds not found")
+        raise
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PREDICTION HELPER
 # ─────────────────────────────────────────────────────────────────────────────
 
-def predict(model, x: pd.DataFrame) -> tuple[int, float, int]:
+def predict(model, x: pd.DataFrame, threshold: float) -> tuple[int, float, int]:
     """
-    Run the IsolationForest pipeline and return (is_anomaly, anomaly_score, raw_label).
-
-      is_anomaly    : 1 = anomaly,  0 = normal    (downstream-friendly convention)
-      anomaly_score : decision_function value;  < 0 → anomaly territory
-      raw_label     : sklearn raw output (-1 anomaly / +1 normal)
+    Runs the IsolationForest model and classifies the result using a custom threshold.
     """
-    raw_label = int(model.predict(x)[0])              # -1 (anomaly) or +1 (normal)
-    anomaly_score = float(model.decision_function(x)[0])  # negative = more anomalous  
+    raw_label = int(model.predict(x)[0])
+    anomaly_score = float(model.decision_function(x)[0])
 
+    # Replace the native model logic with a custom threshold:
+    # If the score is LOWER than the threshold, it is considered an anomaly.
     is_anomaly = (
         Config.OUTPUT_ANOMALY
-        if raw_label == Config.ISOLATION_FOREST_ANOMALY_CLASS
+        if anomaly_score < threshold
         else Config.OUTPUT_NORMAL
     )
+
     return is_anomaly, anomaly_score, raw_label
 
 
@@ -182,6 +190,12 @@ def main() -> None:
 
     # 1. Load model + feature column order from MLflow
     model, model_uri, feature_columns = load_model()
+
+
+    thresholds = load_thresholds()
+    chosen_threshold = thresholds["p50"] # o p05, a seconda di quanto vuoi essere severo
+    logger.info("Thresholds set to: %.4f", chosen_threshold)
+
 
     # 2. Open a persistent HTTP session for Feast REST calls
     session = requests.Session()
@@ -250,7 +264,7 @@ def main() -> None:
             x = build_x(features, feature_columns)
 
             # ── Run model ────────────────────────────────────────────────────
-            is_anomaly, anomaly_score, raw_label = predict(model, x)
+            is_anomaly, anomaly_score, raw_label = predict(model, x, chosen_threshold)
 
             # ── Enrich output ────────────────────────────────────────────────
             out["is_anomaly"]       = is_anomaly

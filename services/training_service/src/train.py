@@ -7,8 +7,8 @@ and logs everything to MLflow.
 
 MLflow run records:
     Parameters  — contamination, row counts, subsampling cap, chunk size
-    Metrics     — anomaly count/rate, score statistics, inference latency
-    Artifacts   — thresholds.json, metrics.json
+    Metrics     — anomaly count/rate, score distributions, inference latency
+    Artifacts   — metrics.json (distribution statistics)
     Model       — full sklearn Pipeline (preprocessing + IsolationForest)
 """
 
@@ -22,7 +22,6 @@ import numpy as np
 from mlflow import sklearn as mlflow_sklearn
 
 from config.settings import Settings
-from src.evaluator import ProductionMetricsCalculator
 from src.load_from_datalake import DataManager
 from src.model import ModelFactory
 from src.utils import create_and_log_signature
@@ -82,7 +81,7 @@ def main() -> None:
         max_fit_rows = s.max_fit_rows
         if len(x_train) > max_fit_rows:
             logger.info(f"[TRAIN] Subsampling {len(x_train):,} → {max_fit_rows:,} rows")
-            x_fit = x_train.sample(n=max_fit_rows, random_state=42)
+            x_fit = x_train.sample(n=max_fit_rows, random_state=s.training.random_state)
         else:
             x_fit = x_train
             logger.info(f"[TRAIN] Training on full dataset ({len(x_train):,} rows)")
@@ -100,64 +99,127 @@ def main() -> None:
         logger.info(f"[INFERENCE] {len(x_train):,} rows → {n_chunks} chunk(s) of {chunk_size:,}")
 
         t_infer = time.time()
-        pred_parts, score_parts, pre_parts = [], [], []
+        pred_parts, score_parts = [], []
 
         for i in range(0, len(x_train), chunk_size):
-            chunk     = x_train.iloc[i : i + chunk_size]
+            chunk = x_train.iloc[i : i + chunk_size]
             chunk_pre = pipe.named_steps["pre"].transform(chunk)
 
             pred_parts.append(pipe.predict(chunk))
             score_parts.append(pipe.named_steps["model"].score_samples(chunk_pre))
-            pre_parts.append(chunk_pre)
 
             logger.info(f"[INFERENCE] Chunk {i // chunk_size + 1}/{n_chunks} — {len(chunk):,} rows")
-
-        predictions = np.concatenate(pred_parts)
-        scores      = np.concatenate(score_parts)
-        x_train_pre = np.concatenate(pre_parts)
-        del pred_parts, score_parts, pre_parts
 
         infer_time = time.time() - t_infer
         latency_ms = (infer_time * 1000) / len(x_train)
         logger.info(f"[INFERENCE] Completed in {infer_time:.2f}s | {latency_ms:.3f} ms/record")
 
-        # ── 3c. EVALUATION ────────────────────────────────────────────────────
-        evaluator  = ProductionMetricsCalculator(s.training.contamination)
-        metrics    = evaluator.calculate_metrics(x_train_pre, predictions, scores, latency_ms, "training")
-        thresholds = evaluator.get_thresholds(scores, predictions)
+        # ── 3c. COMPUTE METRICS (concatenate results) ─────────────────────────
+        predictions = np.concatenate(pred_parts)
+        scores = np.concatenate(score_parts)
+        del pred_parts, score_parts  # free memory
 
-        logger.info(
-            f"[EVAL] Anomalies: {metrics['n_anomalies_detected']} "
-            f"({metrics['anomaly_percentage']:.2f}%) | "
-            f"score p50: {metrics['score_distribution']['p50']:.4f}"
-        )
-        logger.info(
-            f"[THRESHOLDS] p01={thresholds['p01']:.4f} | "
-            f"p05={thresholds['p05']:.4f} | p50={thresholds['p50']:.4f}"
-        )
+        # Anomaly statistics
+        anomaly_count = int((predictions == -1).sum())
+        normal_count = int((predictions == 1).sum())
+        anomaly_rate = anomaly_count / len(predictions)
+
+        # Score distribution statistics
+        score_percentiles = np.percentile(scores, [1, 5, 10, 25, 50, 75, 90, 95, 99])
+
+        logger.info(f"[METRICS] Anomalies: {anomaly_count:,} ({anomaly_rate:.2%})")
+        logger.info(f"[METRICS] Normal: {normal_count:,} ({1 - anomaly_rate:.2%})")
+        logger.info(f"[METRICS] Score mean: {scores.mean():.4f} | std: {scores.std():.4f}")
 
         # ── 3d. LOG PARAMETERS ────────────────────────────────────────────────
         mlflow.log_params({
-            "contamination":        s.training.contamination,
-            "max_fit_rows":         max_fit_rows,
+            "contamination": s.training.contamination,
+            "if_n_estimators": s.training.if_n_estimators,
+            "random_state": s.training.random_state,
+            "max_fit_rows": max_fit_rows,
             "inference_chunk_size": chunk_size,
-            "dataset_size":         len(x_train),
-            "fit_rows":             min(len(x_train), max_fit_rows),
-            "score_distribution":   json.dumps(metrics["score_distribution"]),
+            "dataset_size": len(x_train),
+            "fit_rows": min(len(x_train), max_fit_rows),
+            "n_numeric_features": len(num_cols),
+            "n_categorical_features": len(cat_cols),
         })
 
         # ── 3e. LOG METRICS ───────────────────────────────────────────────────
         mlflow.log_metrics({
-            "n_anomalies_detected": metrics["n_anomalies_detected"],
-            "anomaly_rate":         metrics["anomaly_percentage"],
-            "latency_ms":           metrics["inference_latency_ms"],
-            "score_mean":           metrics["score_statistics"]["mean"],
-            "score_std":            metrics["score_statistics"]["std"],
-            "score_min":            metrics["score_statistics"]["min"],
-            "score_max":            metrics["score_statistics"]["max"],
+            # Anomaly statistics
+            "anomaly_count": anomaly_count,
+            "normal_count": normal_count,
+            "anomaly_rate": anomaly_rate,
+            
+            # Score distribution
+            "score_mean": float(scores.mean()),
+            "score_std": float(scores.std()),
+            "score_min": float(scores.min()),
+            "score_max": float(scores.max()),
+            "score_p01": float(score_percentiles[0]),
+            "score_p05": float(score_percentiles[1]),
+            "score_p10": float(score_percentiles[2]),
+            "score_p25": float(score_percentiles[3]),
+            "score_p50": float(score_percentiles[4]),  # median
+            "score_p75": float(score_percentiles[5]),
+            "score_p90": float(score_percentiles[6]),
+            "score_p95": float(score_percentiles[7]),
+            "score_p99": float(score_percentiles[8]),
+            
+            # Performance
+            "train_time_sec": train_time,
+            "inference_time_sec": infer_time,
+            "latency_ms_per_record": latency_ms,
         })
 
-        # ── 3f. LOG MODEL ─────────────────────────────────────────────────────
+        # ── 3f. EXPORT METRICS JSON ───────────────────────────────────────────
+        os.makedirs(s.output_dir, exist_ok=True)
+        
+        metrics_export = {
+            "dataset": {
+                "total_rows": len(x_train),
+                "fit_rows": min(len(x_train), max_fit_rows),
+                "n_features": x_train.shape[1],
+                "n_numeric_features": len(num_cols),
+                "n_categorical_features": len(cat_cols),
+            },
+            "anomaly_detection": {
+                "anomaly_count": anomaly_count,
+                "normal_count": normal_count,
+                "anomaly_rate": float(anomaly_rate),
+            },
+            "score_distribution": {
+                "mean": float(scores.mean()),
+                "std": float(scores.std()),
+                "min": float(scores.min()),
+                "max": float(scores.max()),
+                "percentiles": {
+                    "p01": float(score_percentiles[0]),
+                    "p05": float(score_percentiles[1]),
+                    "p10": float(score_percentiles[2]),
+                    "p25": float(score_percentiles[3]),
+                    "p50": float(score_percentiles[4]),
+                    "p75": float(score_percentiles[5]),
+                    "p90": float(score_percentiles[6]),
+                    "p95": float(score_percentiles[7]),
+                    "p99": float(score_percentiles[8]),
+                },
+            },
+            "performance": {
+                "train_time_sec": train_time,
+                "inference_time_sec": infer_time,
+                "latency_ms_per_record": latency_ms,
+            },
+        }
+
+        metrics_path = os.path.join(s.output_dir, "metrics.json")
+        with open(metrics_path, "w") as f:
+            json.dump(metrics_export, f, indent=2)
+        
+        mlflow.log_artifact(metrics_path)
+        logger.info(f"[ARTIFACTS] Exported metrics to {metrics_path}")
+
+        # ── 3g. LOG MODEL ─────────────────────────────────────────────────────
         # Signature maps raw DataFrame inputs → model output labels.
         # Always infer from the original (untransformed) DataFrame so that
         # the production API can send JSON directly without pre-processing.
@@ -168,21 +230,8 @@ def main() -> None:
             signature=signature,
             registered_model_name=s.mlflow_model_name,
         )
+
         logger.info("[MLFLOW] Pipeline registered successfully")
-
-        # ── 3g. LOG ARTIFACTS ─────────────────────────────────────────────────
-        # thresholds.json — decision boundaries for future inference services
-        # metrics.json    — full evaluation snapshot for this training run
-        mlflow.log_dict(thresholds, "thresholds.json")
-        mlflow.log_dict(metrics,    "metrics.json")
-
-        # Write thresholds locally so downstream services can read them
-        # without hitting MLflow (optional convenience copy)
-        os.makedirs(s.output_dir, exist_ok=True)
-        thresholds_path = os.path.join(s.output_dir, "thresholds.json")
-        with open(thresholds_path, "w") as f:
-            json.dump(thresholds, f, indent=2)
-        logger.info(f"[ARTIFACTS] thresholds.json saved to {thresholds_path}")
 
     logger.info("[MAIN] First training run completed successfully!")
 
