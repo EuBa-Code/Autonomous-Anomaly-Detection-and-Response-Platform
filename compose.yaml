@@ -644,7 +644,11 @@ services:
       start_period: 30s
     depends_on:
       mongodb:
-        conditions: service_healthy
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ingestion_rag:
+        condition: service_completed_succesfully
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -665,6 +669,11 @@ services:
     volumes:
       - ./services/mcp_server_service/qdrant/config/qdrant_config.yaml:/qdrant/config/production.yaml 
       - ./qdrant_data:/qdrant/storage
+    test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - anomaly-detection-network
 
@@ -683,6 +692,9 @@ services:
     volumes:
       - ./rag_files:/ingestion_rag_service/rag_files:ro
       - ./local_models:/ingestion_rag_service/models    
+    depends_on:
+      qdrant:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
       
