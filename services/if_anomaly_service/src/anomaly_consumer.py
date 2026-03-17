@@ -76,7 +76,7 @@ def timestamp_extractor(
     return int(timestamp)
 
 def trigger_mcp_investigation(message: dict):
-    machine_id = str(message.get('Machine_ID', 'unknown'))
+    machine_id = str(message.get('machine_id', 'unknown'))
     logger.info(f"🚨 ANOMALY DETECTED: Triggering investigation for {machine_id}")
 
     payload = {
