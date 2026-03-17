@@ -78,6 +78,12 @@ services:
     container_name: redis_online_store
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     networks:
       - anomaly-detection-network
 
@@ -86,6 +92,9 @@ services:
     container_name: redis_insight
     ports:
       - "5540:5540" 
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -128,6 +137,9 @@ services:
       - ./services/feature_store_service/src:/feature_store_service/src
     ports:
       - "8000:6566"
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
     command: [ "uv", "run", "feast", "serve", "--host", "0.0.0.0", "--port", "6566" ]
