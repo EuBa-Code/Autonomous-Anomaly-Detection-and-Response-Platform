@@ -257,8 +257,8 @@ services:
         condition: service_healthy
       feature_store_service:
         condition: service_healthy
-      data_engineering:
-        condition: service_completed_successfully
+      create_offline_files:
+        condition: service_completed_succesfully
     networks:
       - anomaly-detection-network
     restart: "no"
@@ -279,7 +279,6 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
-    depends_on:
       create_datasets:
         condition: service_completed_successfully
     networks:
@@ -430,6 +429,8 @@ services:
         condition: service_healthy
       feature_store_service:
         condition: service_healthy
+      training_service:
+        condition: service_completed_succesfully
     networks:
       - anomaly-detection-network
     restart: unless-stopped
