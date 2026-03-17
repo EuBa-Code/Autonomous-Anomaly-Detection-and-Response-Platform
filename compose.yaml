@@ -574,10 +574,11 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
+      inference_service:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
     restart: unless-stopped                          
-
 
   # Used for debugging ONLY
   fakeproducer:
@@ -603,6 +604,13 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-admin}
       MONGO_INITDB_DATABASE: anomaly_reports
+    healthcheck:
+      test: ["CMD", "mongosh", "--exec", "db.adminCommand('ping')", "localhost:27017/test", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    ports:
     ports:
       - "27017:27017"
     volumes:
@@ -628,6 +636,15 @@ services:
       - QDRANT_COLLECTION=ingestion_rag_service  
     ports:
       - "8020:8020"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s = socket.socket(); s.connect(('localhost', 8020))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      mongodb:
+        conditions: service_healthy
     networks:
       - anomaly-detection-network
     restart: unless-stopped
