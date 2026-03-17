@@ -196,6 +196,9 @@ services:
       - ./services/data_engineering_service:/app/services/data_engineering_service 
     ports:
       - "4041:4040"
+    depends_on:
+      create_datasets:
+        condition: service_completed_successfully
     networks:
       - anomaly-detection-network
     shm_size: '2gb'
@@ -249,6 +252,8 @@ services:
         condition: service_healthy
       feature_store_service:
         condition: service_healthy
+      data_engineering:
+        condition: service_completed_successfully
     networks:
       - anomaly-detection-network
     restart: "no"
@@ -269,6 +274,9 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
+    depends_on:
+      create_datasets:
+        condition: service_completed_successfully
     networks:
       - anomaly-detection-network
     restart: 'no'
@@ -296,6 +304,9 @@ services:
       - ./data/models:/training_service/models
       - ./data/metrics:/training_service/metrics
       - ./outputs:/outputs
+    depends_on:
+      data_engineering:
+        condition: service_completed_successfully
     networks:
       - anomaly-detection-network
     restart: 'no'
