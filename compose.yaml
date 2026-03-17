@@ -718,6 +718,12 @@ services:
       - ./local_models/hf_cache:/root/.cache/huggingface  
     ports:
       - "8222:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 20s
+      retries: 10
+      start_period: 60s 
     networks:
       - anomaly-detection-network
     restart: unless-stopped                
@@ -738,6 +744,14 @@ services:
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
     ports:
       - "8010:8010"
+    test: ["CMD", "python3", "-c", "import socket; s = socket.socket(); s.connect(('localhost', 8010))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      vllm:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
     restart: unless-stopped
