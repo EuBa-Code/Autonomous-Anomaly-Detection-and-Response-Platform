@@ -27,6 +27,12 @@ services:
       - "19644:9644"
     volumes:
       - ./redpanda_storage:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health", "--brokers", "localhost:9092"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - anomaly-detection-network
 
@@ -39,6 +45,9 @@ services:
       KAFKA_BROKERS: redpanda:9092
       KAFKA_SCHEMAREGISTRY_ENABLED: "true"
       KAFKA_SCHEMAREGISTRY_URLS: http://redpanda:8081
+    depends_on:
+      redpanda:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
 
@@ -52,6 +61,9 @@ services:
         rpk topic create telemetry-data --brokers redpanda:9092 || true
         rpk topic create predictions --brokers redpanda:9092 || true
         rpk topic list --brokers redpanda:9092
+    depends_on:
+      redpanda:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
     restart: "no"
@@ -204,8 +216,6 @@ services:
       dockerfile: utils/cold_start_util/Dockerfile
     container_name: cold_start_util
     profiles: [ "online" ]  
-      # feature_store_service:
-      #   condition: service_healthy
     volumes:
       - ./data/registry:/data/registry
       - ./data/offline:/data/offline
@@ -222,12 +232,14 @@ services:
       context: .
       dockerfile: services/producer_service/dockerfile
     container_name: telemetry_producer
-    # profiles: [ "simulation" ]
     environment:
       - PYTHONUNBUFFERED=1
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
     volumes:
       - ./data/synthetic_datasets:/producer/data/streaming_data:ro
+    depends_on:
+      redpanda:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
     restart: 'no'
@@ -302,6 +314,9 @@ services:
       - ./data/registry:/data/registry
       - ./data/offline:/data/offline 
       - ./data/entity_df:/data/entity_df
+    depends_on:
+      redpanda:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -360,6 +375,9 @@ services:
       - ./outputs:/inference_service/outputs:ro
     ports:
       - "8001:8000"
+    depends_on:
+      redpanda:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -460,6 +478,9 @@ services:
       - MCP_API_URL=http://langchain_service:8010   
       - REDPANDA_BROKERS=redpanda:9092
       - PREDICTIONS_TOPIC=predictions
+    depends_on:
+      redpanda:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
     restart: unless-stopped                          
