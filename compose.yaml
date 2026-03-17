@@ -28,13 +28,14 @@ services:
     volumes:
       - ./redpanda_storage:/var/lib/redpanda/data
     healthcheck:
-      test: ["CMD", "rpk", "cluster", "health", "--brokers", "localhost:9092"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      test: ["CMD-SHELL", "curl -sf http://localhost:9644/v1/node_config > /dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 45s
     networks:
       - anomaly-detection-network
+
 
   redpanda-console:
     image: docker.redpanda.com/redpandadata/console:latest
@@ -107,6 +108,7 @@ services:
       context: .
       dockerfile: services/feature_store_service/Dockerfile
     container_name: feature_store_apply
+    profiles: ["setup"]
     environment:
       - PYTHONUNBUFFERED=1
     volumes:
@@ -117,7 +119,6 @@ services:
     networks:
       - anomaly-detection-network
     restart: 'no'
-    profiles: [ "setup" ]
     depends_on:
       redis:
         condition: service_healthy
@@ -130,7 +131,7 @@ services:
       context: .
       dockerfile: services/feature_store_service/Dockerfile
     container_name: feature_store_service
-    profiles: [ "online" ]
+    profiles: [ "setup", "online" ] 
     environment:
       - PYTHONUNBUFFERED=1
       - FEAST_REPO_PATH=/feature_store_service
@@ -210,6 +211,7 @@ services:
       context: .
       dockerfile: services/dockerfile.spark_services
     container_name: batch_feature_pipeline
+    profiles: ["airflow"]  # Triggered by Airflow, not compose up
     command: [ "-m", "batch_pipeline_service.src.batch_pipeline" ] 
     environment:
       - APP_HOME=/app
@@ -238,8 +240,8 @@ services:
     volumes:
       - ./data:/data
     depends_on:
-      data_engineering_service:
-        condition: service_completed_succesfully
+      data_engineering:
+        condition: service_completed_successfully
     networks:
       - anomaly-detection-network
     restart: "no" 
@@ -249,7 +251,7 @@ services:
       context: .
       dockerfile: utils/cold_start_util/Dockerfile
     container_name: cold_start_util
-    profiles: [ "online" ]  
+    profiles: [ "setup" ]  
     volumes:
       - ./data/registry:/data/registry
       - ./data/offline:/data/offline
@@ -260,7 +262,7 @@ services:
       feature_store_service:
         condition: service_healthy
       create_offline_files:
-        condition: service_completed_succesfully
+        condition: service_completed_successfully
     networks:
       - anomaly-detection-network
     restart: "no"
@@ -273,6 +275,7 @@ services:
       context: .
       dockerfile: services/producer_service/dockerfile
     container_name: telemetry_producer
+    profiles: [ "online" ]  
     environment:
       - PYTHONUNBUFFERED=1
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
@@ -331,6 +334,7 @@ services:
       context: .
       dockerfile: services/retraining_service/Dockerfile
     container_name: retraining_service
+    profiles: ["airflow"]  # Triggered by Airflow, not compose up
     environment:
       - PYTHONUNBUFFERED=1
       - MLFLOW_TRACKING_URI=http://mlflow:5000
@@ -451,8 +455,6 @@ services:
         condition: service_healthy
       feature_store_service:
         condition: service_healthy
-      training_service:
-        condition: service_completed_successfully
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -648,7 +650,7 @@ services:
       qdrant:
         condition: service_healthy
       ingestion_rag:
-        condition: service_completed_succesfully
+        condition: service_completed_successfully
     networks:
       - anomaly-detection-network
     restart: unless-stopped
@@ -683,6 +685,7 @@ services:
       context: .
       dockerfile: services/ingestion_rag_service/Dockerfile
     container_name: ingestion_rag_service
+    profiles: ["setup"]  
     runtime: nvidia
     environment:
       - PYTHONPATH=/ingestion_rag_service

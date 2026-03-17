@@ -137,7 +137,7 @@ first-run: full-datasets feature-store-setup first-training online-services cold
 	@echo "  - vLLM:              http://localhost:8222"
 	@echo "  - LangChain Agent:   http://localhost:8010"
 
-online-run: online-services cold-start full-data-flow ## Start only online services (assumes setup is done)
+online-run: online-services full-data-flow ## Start only online services (assumes setup is done)
 	@echo "$(GREEN)🎉 Online system is running!$(NC)"
 
 ##@ Data Management
@@ -225,3 +225,13 @@ help: ## Display this help message
 	@echo "  8. make cold-start           # Populate Redis"
 	@echo "  9. make full-data-flow       # Start producer"
 	@echo ""
+
+
+cd:
+	sudo rm -rf data/offline/streaming_backfill \
+	sudo rm -rf data/entity_df/telemetry_data \
+	sudo rm -rf /tmp/quix_state/ \
+	sudo rm -rf /inference_service/state/ \
+	docker exec -it redpanda_broker rpk topic delete telemetry-data predictions || true \
+	docker exec -it redpanda_broker rpk topic create telemetry-data -p 1 -r 1 \
+	docker exec -it redpanda_broker rpk topic create predictions -p 1 -r 1 \
