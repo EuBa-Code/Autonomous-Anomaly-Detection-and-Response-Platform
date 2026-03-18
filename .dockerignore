@@ -5,3 +5,9 @@ models/
 __pycache__/
 logs/
 **/logs/
+
+
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache

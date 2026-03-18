@@ -17,8 +17,7 @@ ENV PATH="/root/.local/bin:$PATH"
 WORKDIR /ingestion_rag_service
 COPY services/ingestion_rag_service/pyproject.toml services/ingestion_rag_service/uv.lock ./
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen \
+RUN uv sync --frozen \
     --index "pytorch-cu126=https://download.pytorch.org/whl/cu126"
 
 COPY services/ingestion_rag_service/ ./

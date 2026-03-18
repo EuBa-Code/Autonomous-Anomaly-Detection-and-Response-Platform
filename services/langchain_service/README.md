@@ -112,4 +112,4 @@ docker build -f services/langchain_service/Dockerfile -t langchain_service:lates
 docker compose --profile online up langchain_service
 ```
 
-Depends on `vllm` (healthy) and `mcp_server` (healthy) before the agent can be initialised.
+Depends on `vllm` (healthy) before the agent can be initialised.

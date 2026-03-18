@@ -1,9 +1,6 @@
-# Anomaly Detection — End to End MLOps System
-## Overview
+# 🏭 Anomaly Detection — Autonomous-Anomaly-Detection-and-Response-Platform
 
-End-to-end, production-ready anomaly detection system for industrial washing machines. The architecture is built around a **dual-pipeline feature store** pattern that eliminates training-serving skew: the same features computed offline for training are served online at inference time, through a single versioned contract.
-
-The focus of this project is **architectural correctness and service connectivity**, not model accuracy. All sensor data is synthetic. The model is an unsupervised `IsolationForest`. The goal is to demonstrate how a real-time ML system integrates streaming features, batch features, model registry, online inference, RAG-based investigation, and operator notification into a single coherent production stack.
+> Production-ready, real-time anomaly detection for industrial washing machines — built on a dual-pipeline feature store, streaming inference, RAG-based investigation, and automated retraining.
 
 <p align="center">
   <img src="docs/Architecture.drawio.svg" width="1200">
@@ -11,18 +8,51 @@ The focus of this project is **architectural correctness and service connectivit
 
 ---
 
-## Architecture
+## 📑 Table of Contents
+
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Project Structure](#-project-structure)
+- [Detailed Data Flow](#-detailed-data-flow)
+  - [1 — Data Preparation](#1--data-preparation-offline-run-once)
+  - [2 — Streaming Pipeline](#2--streaming-pipeline-real-time)
+  - [3 — Batch Pipeline](#3--batch-pipeline-airflow--daily)
+  - [4 — Inference Pipeline](#4--inference-pipeline-real-time)
+  - [5 — Anomaly Investigation](#5--anomaly-investigation-event-driven)
+  - [6 — Retraining Pipeline](#6--retraining-pipeline-airflow--weekly)
+- [Feature Vector at Inference Time](#-feature-vector-at-inference-time)
+- [Cold Start & Utility Services](#-cold-start--utility-services)
+- [Retraining vs Training](#-retraining-vs-training)
+- [Quick Start 🚀](#-quick-start)
+  - [Prerequisites](#%EF%B8%8F-prerequisites)
+  - [Make Commands](#-make-commands)
+- [Infrastructure at a Glance](#-infrastructure-at-a-glance)
+- [Service Documentation](#-service-documentation)
+- [External References](#-external-references)
+- [Requirements](#-requirements)
+- [License](#-license)
+
+---
+
+## 🧠 Overview
+
+End-to-end, production-ready anomaly detection system for industrial washing machines. The architecture is built around a **dual-pipeline feature store** pattern that eliminates training-serving skew: the same features computed offline for training are served online at inference time, through a single versioned contract.
+
+The focus of this project is **architectural correctness and service connectivity**, not model accuracy. All sensor data is synthetic. The model is an unsupervised `IsolationForest`. The goal is to demonstrate how a real-time ML system integrates streaming features, batch features, model registry, online inference, RAG-based investigation, and operator notification into a single coherent production stack.
+
+---
+
+## 🏗️ Architecture
 
 The system is composed of five interconnected pipelines. Each is independent but shares state through the feature store, message broker, and model registry.
 
 <p align="center">
-  <img src="docs/Pipelines.jpg" width="800"></img>
+  <img src="docs/Pipelines.jpg" width="800">
 </p>
----
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 .
@@ -67,7 +97,9 @@ The system is composed of five interconnected pipelines. Each is independent but
     └── offline_files_util/             # Feast offline store folder bootstrap
 ```
 
-## Detailed Data Flow
+---
+
+## 🔄 Detailed Data Flow
 
 ### 1 — Data Preparation (offline, run once)
 
@@ -194,7 +226,7 @@ The inference service always loads `models:/if_anomaly_detector/latest` — no c
 
 ---
 
-## Feature Vector at Inference Time
+## 🎯 Feature Vector at Inference Time
 
 All four features are served by `machine_anomaly_service_v1` from a single Feast call:
 
@@ -207,7 +239,7 @@ All four features are served by `machine_anomaly_service_v1` from a single Feast
 
 ---
 
-## Cold Start & Utility Services
+## ❄️ Cold Start & Utility Services
 
 Two utility containers handle first-run bootstrapping:
 
@@ -217,7 +249,7 @@ Two utility containers handle first-run bootstrapping:
 
 ---
 
-## Retraining vs Training
+## ⚖️ Retraining vs Training
 
 | Aspect | `training_service` | `retraining_service` |
 |---|---|---|
@@ -229,49 +261,68 @@ Two utility containers handle first-run bootstrapping:
 
 ---
 
-## Startup Order
+## 🚀 Quick Start
 
-### One-time setup (before first online run)
+### 🛠️ Prerequisites
+
+Before running any command, make sure you have **`make`** installed on your system:
 
 ```bash
-# 1. Create offline store folders
-docker compose run --rm create_offline_files
+# Ubuntu/Debian
+sudo apt-get install make
 
-# 2. Generate synthetic data
-docker compose run --rm create_datasets
+# macOS
+brew install make
 
-# 3. Feature engineering
-docker compose run --rm data_engineering
+# Windows (via Chocolatey)
+choco install make
 
-# 4. Compute and materialize batch features
-docker compose run --rm batch_feature_pipeline
+# Windows (via Scoop)
+scoop install make
 
-# 5. Register Feast feature definitions
-docker compose --profile setup run --rm feature_store_apply
-
-# 6. Initial model training
-docker compose run --rm training_service
-
-# 7. Build Qdrant knowledge base (requires GPU)
-docker compose run --rm ingestion_rag
+# Windows (via Winget)
+winget install GnuWin32.Make
 ```
 
-### Online stack
+> **Windows users:** it is recommended to run all `make` commands inside **WSL2** (Windows Subsystem for Linux) or **Git Bash** for best compatibility.
+
+---
+
+### ⚡ Make Commands
+
+All project workflows are managed via `make`. Run `make help` to see all available commands.
+
+| Command | Description |
+|---|---|
+| `make first-run` | Complete setup from scratch (first time only) |
+| `make online-run` | Start online services (setup already done) |
+| `make stop` | Stop all running services |
+| `make clean` | Stop services and remove volumes |
+| `make clean-all` | Complete cleanup including all data directories |
+| `make rebuild` | Full teardown and rebuild from scratch |
+| `make health` | Check health of all services |
+| `make logs` | Tail logs from all services |
+| `make logs-service SERVICE=<name>` | Tail logs from a specific service |
+
+**Step-by-step breakdown of `make first-run`:**
 
 ```bash
-# Start all online services
-docker compose --profile online up
-```
+make help                 # 0. Display full command reference
 
-### Airflow (scheduled automation)
-
-```bash
-docker compose up airflow-webserver airflow-scheduler airflow-worker
+make init_linux           # 1. Create required directories
+make full-datasets        # 2. Generate synthetic data
+make infrastructure       # 3. Start core services
+make airflow              # 4. Start orchestration
+make feature-store-setup  # 5. Register Feast features
+make first-training       # 6. Train initial model
+make online-services      # 7. Start online services
+make cold-start           # 8. Populate Redis with historical features
+make full-data-flow       # 9. Start telemetry data producer
 ```
 
 ---
 
-## Infrastructure at a Glance
+## 🖥️ Infrastructure at a Glance
 
 | Service | Technology | Port |
 |---|---|---|
@@ -290,32 +341,56 @@ docker compose up airflow-webserver airflow-scheduler airflow-worker
 
 ---
 
-## Service Documentation
+## 📚 Service Documentation
 
 Each service has its own README with full details on file structure, configuration, and design decisions:
 
 | Service | README |
 |---|---|
-| Airflow Service | [services/airflow_service/README.md](services/airflow_service/README.md) |
-| Batch Pipeline Service | [services/batch_pipeline_service/README.md](services/batch_pipeline_service/README.md) |
-| Create Datasets Service | [services/create_datasets_service/README.md](services/create_datasets_service/README.md) |
-| Data Engineering Service | [services/data_engineering_service/README.md](services/data_engineering_service/README.md) |
-| Feature Store Service | [services/feature_store_service/README.md](services/feature_store_service/README.md) |
-| If Anomaly Service | [services/if_anomaly_service/README.md](services/if_anomaly_service/README.md) |
-| Inference Service | [services/inference_service/README.md](services/inference_service/README.md) |
-| Ingestion RAG Service | [services/ingestion_rag_service/README.md](services/ingestion_rag_service/README.md) |
-| LangChain Service | [services/langchain_service/README.md](services/langchain_service/README.md) |
-| MCP Server Service | [services/mcp_server_service/README.md](services/mcp_server_service/README.md) |
-| Producer Service | [services/producer_service/README.md](services/producer_service/README.md) |
-| Redis Service | [services/redis_service/README.md](services/redis_service/README.md) |
-| Retraining Service | [services/retraining_service/README.md](services/retraining_service/README.md) |
-| Streaming Service | [services/streaming_service/README.md](services/streaming_service/README.md) |
-| Training Service | [services/training_service/README.md](services/training_service/README.md) |
-| vLLM Service | [services/vllm_service/README.md](services/vllm_service/README.md) |
+| ✈️ Airflow Service | [services/airflow_service/README.md](services/airflow_service/README.md) |
+| 📦 Batch Pipeline Service | [services/batch_pipeline_service/README.md](services/batch_pipeline_service/README.md) |
+| 🧪 Create Datasets Service | [services/create_datasets_service/README.md](services/create_datasets_service/README.md) |
+| ⚙️ Data Engineering Service | [services/data_engineering_service/README.md](services/data_engineering_service/README.md) |
+| 🏪 Feature Store Service | [services/feature_store_service/README.md](services/feature_store_service/README.md) |
+| 🚨 If Anomaly Service | [services/if_anomaly_service/README.md](services/if_anomaly_service/README.md) |
+| 🔍 Inference Service | [services/inference_service/README.md](services/inference_service/README.md) |
+| 📥 Ingestion RAG Service | [services/ingestion_rag_service/README.md](services/ingestion_rag_service/README.md) |
+| 🦜 LangChain Service | [services/langchain_service/README.md](services/langchain_service/README.md) |
+| 🔌 MCP Server Service | [services/mcp_server_service/README.md](services/mcp_server_service/README.md) |
+| 📡 Producer Service | [services/producer_service/README.md](services/producer_service/README.md) |
+| 🗃️ Redis Service | [services/redis_service/README.md](services/redis_service/README.md) |
+| 🔁 Retraining Service | [services/retraining_service/README.md](services/retraining_service/README.md) |
+| 🌊 Streaming Service | [services/streaming_service/README.md](services/streaming_service/README.md) |
+| 🎓 Training Service | [services/training_service/README.md](services/training_service/README.md) |
+| ⚡ vLLM Service | [services/vllm_service/README.md](services/vllm_service/README.md) |
 
 ---
 
-## Requirements
+## 🔗 External References
+
+Core technologies used in this project — useful for deeper understanding and configuration:
+
+| Technology | Docs | Description |
+|---|---|---|
+| 🍽️ Feast | [docs.feast.dev](https://docs.feast.dev) | Feature store — offline/online serving, materialization |
+| 🔴 Redis | [redis.io/docs](https://redis.io/docs/latest/) | Online feature store backend |
+| 🐼 Redpanda | [docs.redpanda.com](https://docs.redpanda.com) | Kafka-compatible message broker |
+| 🌊 QuixStreams | [quix.io/docs/quix-streams](https://quix.io/docs/quix-streams/introduction.html) | Python streaming framework |
+| 🪄 MLflow | [mlflow.org/docs](https://mlflow.org/docs/latest/index.html) | Model registry and experiment tracking |
+| ✈️ Apache Airflow | [airflow.apache.org/docs](https://airflow.apache.org/docs/stable/index.html) | Workflow orchestration |
+| 🔷 Qdrant | [qdrant.tech/documentation](https://qdrant.tech/documentation/) | Vector database for RAG retrieval |
+| 🍃 MongoDB | [mongodb.com/docs](https://www.mongodb.com/docs/) | Audit log storage |
+| ⚡ vLLM | [docs.vllm.ai](https://docs.vllm.ai/en/latest/) | High-throughput LLM serving |
+| 🦜 LangChain | [python.langchain.com/docs](https://python.langchain.com/docs/introduction/) | LLM orchestration framework |
+| 🔗 LangGraph | [langchain-ai.github.io/langgraph](https://langchain-ai.github.io/langgraph/) | ReAct agent framework |
+| 🛠️ FastMCP | [gofastmcp.com/docs](https://gofastmcp.com/getting-started/welcome) | MCP server framework |
+| 🤗 HuggingFace | [huggingface.co/docs](https://huggingface.co/docs) | Model hub for embeddings and LLMs |
+| 🐳 Docker Compose | [docs.docker.com/compose](https://docs.docker.com/compose/) | Multi-container orchestration |
+| 🌩️ NVIDIA Container Toolkit | [docs.nvidia.com/datacenter/cloud-native](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/index.html) | GPU support for Docker |
+
+---
+
+## 📋 Requirements
 
 - Docker + Docker Compose
 - NVIDIA GPU (required by `ingestion_rag_service` and `vllm_service`)
@@ -323,3 +398,9 @@ Each service has its own README with full details on file structure, configurati
 - ~8 GB VRAM minimum (vLLM: ~4 GB, bge-m3: ~2 GB)
 - HuggingFace token (set `HUGGING_FACE_HUB_TOKEN` in `.env` for gated models)
 - Slack webhook URL (optional — set `SLACK_WEBHOOK_URL` in `.env` to enable operator notifications)
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).

@@ -70,4 +70,4 @@ docker build -f services/vllm_service/Dockerfile -t vllm_service:latest .
 docker compose --profile online up vllm
 ```
 
-The compose healthcheck polls `GET /health` every 20 seconds with a 120-second `start_period` — the model load takes 1–2 minutes on first boot from cache.
+The compose healthcheck polls `GET /health` every 30 seconds with a 60-second `start_period` — the model load takes 1–2 minutes on first boot from cache.

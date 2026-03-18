@@ -82,6 +82,14 @@ first-training: infrastructure ## Run initial model training (requires datasets)
 		training_service
 	@echo "$(GREEN)✅ Training completed$(NC)"
 
+##@ RAG Ingestion (one-time only)
+
+ingest-rag: infrastructure ## Index documents into Qdrant (run ONCE, before online-services)
+	@echo "$(BLUE)📚 Running RAG ingestion — GPU exclusive...$(NC)"
+	docker compose --profile setup up --build --abort-on-container-exit \
+		ingestion_rag
+	@echo "$(GREEN)✅ RAG ingestion completed — GPU released$(NC)"
+
 ##@ Online Services
 
 online-services: infrastructure airflow ## Start all online services
@@ -90,7 +98,6 @@ online-services: infrastructure airflow ## Start all online services
 		feature_store_service \
 		streaming_service \
 		inference_service \
-		ingestion_rag \
 		mcp_server \
 		vllm \
 		langchain_service \
@@ -121,7 +128,7 @@ full-data-flow: ## Start telemetry data producer
 
 ##@ Complete Workflows
 
-first-run: full-datasets feature-store-setup first-training online-services cold-start full-data-flow ## Complete workflow from scratch
+first-run: full-datasets feature-store-setup first-training ingest-rag online-services cold-start full-data-flow
 	@echo "$(GREEN)🎉 Complete system is running!$(NC)"
 	@echo ""
 	@echo "$(YELLOW)📍 All Access Points:$(NC)"

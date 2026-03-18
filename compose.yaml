@@ -274,7 +274,7 @@ services:
     profiles: [ "online" ]  
     environment:
       - PYTHONUNBUFFERED=1
-      - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
+      - KAFKA_SERVER=redpanda:9092
     volumes:
       - ./data/synthetic_datasets:/producer/data/streaming_data:ro
     depends_on:
@@ -366,8 +366,8 @@ services:
       - PYTHONUNBUFFERED=1
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
       - FEAST_REPO_PATH=/streaming_service
-      - DATALAKE_DIR=/data/entity_df        
-      - DATALAKE_FORMAT=parquet
+      - ENTITY_DF_DIR=/data/entity_df        
+      - ENTITY_DF_FORMAT=parquet
     volumes:
       - ./data/models:/streaming_service/data/models:ro
       - ./data/registry:/data/registry
@@ -574,8 +574,8 @@ services:
       - PYTHONPATH=/if_anomaly_service
       - LOG_LEVEL=INFO
       - MCP_API_URL=http://langchain_service:8010   
-      - REDPANDA_BROKERS=redpanda:9092
-      - PREDICTIONS_TOPIC=predictions
+      - KAFKA_SERVER=redpanda:9092
+      - TOPIC_PREDICTIONS=predictions
     depends_on:
       redpanda:
         condition: service_healthy
@@ -642,12 +642,14 @@ services:
       - "8020:8020"
     healthcheck:
       test: ["CMD", "python3", "-c", "import socket; s = socket.socket(); s.connect(('localhost', 8020))"]
-      interval: 20s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 600s
     depends_on:
       mongodb:
+        condition: service_healthy
+      qdrant:
         condition: service_healthy
     networks:
       - anomaly-detection-network
