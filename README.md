@@ -11,6 +11,17 @@ The focus of this project is **architectural correctness and service connectivit
 
 ---
 
+## Architecture
+
+The system is composed of five interconnected pipelines. Each is independent but shares state through the feature store, message broker, and model registry.
+
+<p align="center">
+  <image src="docs/Pipelines.jpg" width="800"></image>
+</p>
+---
+
+---
+
 ## Project Structure
 
 ```
@@ -55,62 +66,6 @@ The focus of this project is **architectural correctness and service connectivit
     ├── cold_start_util/                # First-run Redis materialization
     └── offline_files_util/             # Feast offline store folder bootstrap
 ```
-
----
-
-## Architecture
-
-The system is composed of five interconnected pipelines. Each is independent but shares state through the feature store, message broker, and model registry.
-
-```
- ┌──────────────────────────────────────────────────────────────────────────┐
- │  DATA PREPARATION  (run once before online stack)                        │
- │                                                                          │
- │  create_datasets → data_engineering → batch_pipeline → training_service │
- └──────────────────────────────────────────────────────────────────────────┘
-                                    │
-                          model registered in MLflow
-
- ┌──────────────────────────────────────────────────────────────────────────┐
- │  STREAMING PIPELINE  (real-time, continuous)                             │
- │                                                                          │
- │  producer → Redpanda → streaming_service ──► Feast push sources → Redis │
- │                                         └──► entity_df (raw Parquet)    │
- └──────────────────────────────────────────────────────────────────────────┘
-
- ┌──────────────────────────────────────────────────────────────────────────┐
- │  BATCH PIPELINE  (Airflow — daily at 00:00 UTC)                         │
- │                                                                          │
- │  batch_pipeline_service → offline Parquet → feast materialize → Redis   │
- └──────────────────────────────────────────────────────────────────────────┘
-
- ┌──────────────────────────────────────────────────────────────────────────┐
- │  INFERENCE PIPELINE  (real-time, continuous)                             │
- │                                                                          │
- │  Redpanda (telemetry-data) → inference_service                          │
- │       → Feast (streaming + batch features from Redis)                   │
- │       → IsolationForest → Redpanda (predictions)                        │
- └──────────────────────────────────────────────────────────────────────────┘
-
- ┌──────────────────────────────────────────────────────────────────────────┐
- │  ANOMALY INVESTIGATION  (event-driven, on anomaly only)                  │
- │                                                                          │
- │  if_anomaly_service → langchain_service (ReAct agent)                   │
- │       → MCP server (retrieve_context)                                   │
- │             → Qdrant hybrid RAG                                         │
- │             → MongoDB (audit log)                                       │
- │       → vLLM (Qwen2.5-7B) → Slack notification                         │
- └──────────────────────────────────────────────────────────────────────────┘
-
- ┌──────────────────────────────────────────────────────────────────────────┐
- │  RETRAINING PIPELINE  (Airflow — every Monday 02:00 UTC)                │
- │                                                                          │
- │  retraining_service → Feast point-in-time join → IsolationForest fit    │
- │       → MLflow model registry (new version)                             │
- └──────────────────────────────────────────────────────────────────────────┘
-```
-
----
 
 ## Detailed Data Flow
 
