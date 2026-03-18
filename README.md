@@ -418,12 +418,13 @@ Each service has its own README with full details on file structure, configurati
 | 🌊 Streaming Service | [services/streaming_service/README.md](services/streaming_service/README.md) |
 | 🎓 Training Service | [services/training_service/README.md](services/training_service/README.md) |
 | ⚡ vLLM Service | [services/vllm_service/README.md](services/vllm_service/README.md) |
+| 🧲 Qdrant Service | [services/qdrant_service/README.md](services/qdrant_service/README.md) |
+| 🔬 Mlflow Service | [services/mlflow/README.md](services/mlflow/README.md) |
+
 
 ---
 
 ## 🔗 External References
-
-Core technologies used in this project — useful for deeper understanding and configuration:
 
 | Technology | Docs | Description |
 |---|---|---|
@@ -442,6 +443,9 @@ Core technologies used in this project — useful for deeper understanding and c
 | 🤗 HuggingFace | [huggingface.co/docs](https://huggingface.co/docs) | Model hub for embeddings and LLMs |
 | 🐳 Docker Compose | [docs.docker.com/compose](https://docs.docker.com/compose/) | Multi-container orchestration |
 | 🌩️ NVIDIA Container Toolkit | [docs.nvidia.com/datacenter/cloud-native](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/index.html) | GPU support for Docker |
+| 🧠 scikit-learn | [scikit-learn.org/stable/user_guide](https://scikit-learn.org/stable/user_guide.html) | ML models — training, inference, anomaly detection |
+| 🌩️ PySpark | [spark.apache.org/docs/latest/api/python](https://spark.apache.org/docs/latest/api/python/index.html) | Distributed data processing for dataset creation |
+| 🔔 Slack Webhooks | [api.slack.com/messaging/webhooks](https://api.slack.com/messaging/webhooks) | Anomaly alert notifications |
 
 ---
 

@@ -649,29 +649,39 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      qdrant:
+        condition: service_healthy
     networks:
       - anomaly-detection-network
     restart: unless-stopped
 
   qdrant:
-    image: qdrant/qdrant:latest
+    build:
+      context: .
+      dockerfile: services/qdrant_service/Dockerfile
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     deploy:
       resources:
         limits:
-          memory: 4G        # Increase as needed
+          memory: 4G
         reservations:
           memory: 2G
     ports:
-      - "6333:6333" # HTTP API 
-      - "6334:6334" # gRPC API 
+      - "6333:6333"
+      - "6334:6334"
     environment:
       - QDRANT__STORAGE__ON_DISK_PAYLOAD=true
     volumes:
-      - ./services/mcp_server_service/qdrant/config/qdrant_config.yaml:/qdrant/config/production.yaml 
+      - ./services/mcp_server_service/qdrant/config/qdrant_config.yaml:/qdrant/config/production.yaml
       - ./qdrant_data:/qdrant/storage
     networks:
       - anomaly-detection-network
-
+      
   ingestion_rag:
     build:
       context: .
