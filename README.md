@@ -59,7 +59,7 @@ This project leverages the "Best-of-Breed" tools in the current MLOps landscape:
 | **Stream Processing**| **Redpanda** & **QuixStreams** | Sub-second telemetry ingestion and windowing |
 | **Feature Store** | **Feast** (Redis/Parquet) | The "Single Source of Truth" for ML features |
 | **Model Lifecycle** | **MLflow** | Experiment tracking and versioned model registry |
-| **LLM / RAG** | **vLLM** & **LangGraph** | High-throughput local LLM serving and ReAct agents |
+| **LLM / RAG** | **vLLM** & **LangChain** | High-throughput local LLM serving and ReAct agents |
 | **Vector Search** | **Qdrant** | Hybrid search (Dense + Sparse) for machine manuals |
 | **Infrastructure** | **Docker Compose** | Full multi-service orchestration |
 
@@ -245,7 +245,7 @@ if_anomaly_service
   └─ POST /chat/stream → langchain_service
         │
         ▼
-langchain_service  (FastAPI + LangGraph ReAct agent)
+langchain_service  (FastAPI + LangChain ReAct agent)
   └─ Agent calls MCP tool: retrieve_context(query, machine_id)
         │
         ▼
