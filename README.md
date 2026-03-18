@@ -6,7 +6,7 @@ End-to-end, production-ready anomaly detection system for industrial washing mac
 The focus of this project is **architectural correctness and service connectivity**, not model accuracy. All sensor data is synthetic. The model is an unsupervised `IsolationForest`. The goal is to demonstrate how a real-time ML system integrates streaming features, batch features, model registry, online inference, RAG-based investigation, and operator notification into a single coherent production stack.
 
 <p align="center">
-  <video src="docs/Architecture.mp4" width="800" autoplay loop muted playsinline></video>
+  <image src="docs/Architecture.drawio.svg" width="1200"></image>
 </p>
 
 ---
