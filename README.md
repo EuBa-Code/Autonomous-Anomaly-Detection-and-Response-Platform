@@ -1,6 +1,7 @@
 # 🏭 Anomaly Detection — Autonomous-Anomaly-Detection-and-Response-Platform
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Python 3.10+](https://img.shields.io/badge/python-3.11%2B-blue.svg) ![Docker Support](https://img.shields.io/badge/docker-supported-blue.svg) ![CUDA Required](https://img.shields.io/badge/CUDA-Required-green.svg) 
 
-> Production-ready, real-time anomaly detection for industrial washing machines — built on a dual-pipeline feature store, streaming inference, RAG-based investigation, and automated retraining.
+> **Bridging the gap between ML models and Production Reliability.** This platform handles the entire lifecycle of an industrial anomaly detection system—from sub-second streaming inference to RAG-powered automated investigations.
 
 <p align="center">
   <img src="docs/Architecture.drawio.svg" width="1200">
@@ -10,8 +11,11 @@
 
 ## 📑 Table of Contents
 
+- [The Story: Why This Project?](#-the-story-why-this-project)
+- [The Modern ML Stack](#%EF%B8%8F-the-modern-ml-stack)
+- [Architectural Decisions](#-architectural-decisions-the-why)
 - [Overview](#-overview)
-- [Architecture](#-architecture)
+- [Architecture](#%EF%B8%8F-architecture)
 - [Project Structure](#-project-structure)
 - [Detailed Data Flow](#-detailed-data-flow)
   - [1 — Data Preparation](#1--data-preparation-offline-run-once)
@@ -21,16 +25,66 @@
   - [5 — Anomaly Investigation](#5--anomaly-investigation-event-driven)
   - [6 — Retraining Pipeline](#6--retraining-pipeline-airflow--weekly)
 - [Feature Vector at Inference Time](#-feature-vector-at-inference-time)
-- [Cold Start & Utility Services](#-cold-start--utility-services)
-- [Retraining vs Training](#-retraining-vs-training)
-- [Quick Start 🚀](#-quick-start)
+- [Cold Start & Utility Services](#%EF%B8%8F-cold-start--utility-services)
+- [Retraining vs Training](#%EF%B8%8F-retraining-vs-training)
+- [Quick Start](#-quick-start)
   - [Prerequisites](#%EF%B8%8F-prerequisites)
   - [Make Commands](#-make-commands)
-- [Infrastructure at a Glance](#-infrastructure-at-a-glance)
+- [Infrastructure at a Glance](#%EF%B8%8F-infrastructure-at-a-glance)
 - [Service Documentation](#-service-documentation)
 - [External References](#-external-references)
 - [Requirements](#-requirements)
 - [License](#-license)
+
+---
+
+## 📖 The Story: Why This Project?
+
+In industrial settings, a "washing machine" isn't just an appliance; it's a critical asset. If a bearing fails or a motor overheats, the cost of downtime is measured in thousands of dollars per hour. 
+
+Most ML projects end at the "Notebook" stage. This project solves the **"Production Gap"**:
+* **The Problem:** Models often fail because the data they see in training doesn't match the data they see in production (**Training-Serving Skew**).
+* **The Solution:** I built a **Dual-Pipeline Feature Store** architecture. Whether a feature is computed in a 10-minute streaming window or a 24-hour batch job, the Inference Service sees a single, consistent version of the truth.
+* **The Result:** An autonomous agent that doesn't just say "there is an anomaly," but investigates the machine's manual and tells the operator *exactly* what is wrong via Slack.
+
+---
+
+## 🛠️ The Modern ML Stack
+
+This project leverages the "Best-of-Breed" tools in the current MLOps landscape:
+
+| Category | Technology | Usage |
+| :--- | :--- | :--- |
+| **Orchestration** | **Apache Airflow** | Batch processing & Weekly retraining triggers |
+| **Stream Processing**| **Redpanda** & **QuixStreams** | Sub-second telemetry ingestion and windowing |
+| **Feature Store** | **Feast** (Redis/Parquet) | The "Single Source of Truth" for ML features |
+| **Model Lifecycle** | **MLflow** | Experiment tracking and versioned model registry |
+| **LLM / RAG** | **vLLM** & **LangGraph** | High-throughput local LLM serving and ReAct agents |
+| **Vector Search** | **Qdrant** | Hybrid search (Dense + Sparse) for machine manuals |
+| **Infrastructure** | **Docker Compose** | Full multi-service orchestration |
+
+---
+
+## ❓ Architectural Decisions (The "Why")
+
+In a technical interview, the first question is always: *"Why did you choose this tool over others?"* Here is the rationale behind this architecture:
+
+### 1. Why Feast instead of a standard PostgreSQL?
+Standard databases don't version features or handle point-in-time joins. **Feast** ensures that when I retrain my model, I can look back at exactly what the machine "felt" at 2:00 PM last Tuesday, preventing data leakage and ensuring the training set perfectly mirrors the online environment.
+
+### 2. Why Redpanda instead of Kafka?
+For a production-ready developer environment, **Redpanda** is a game-changer. It provides a Kafka-compatible API but runs as a single binary without the overhead of Zookeeper or KRaft. It is faster to deploy and significantly lower in resource consumption during development.
+
+### 3. Why vLLM instead of llama.cpp?
+While `llama.cpp` is excellent for local CPU execution, **vLLM** was chosen for its **Production Throughput**:
+* **PagedAttention:** Optimizes VRAM by managing KV cache in pages, allowing concurrent anomaly investigations without crashing.
+* **Continuous Batching:** Schedules requests at the iteration level, ensuring sub-second response times even under heavy loads.
+
+### 4. Why use the Model Context Protocol (MCP)?
+**FastMCP** allows the LangChain agent to interact with the database (MongoDB) and Vector Store (Qdrant) through a standardized interface. This makes the agent "tool-agnostic"—I can swap out the vector DB tomorrow without rewriting the agent's logic.
+
+### 5. Why Slack for notifications?
+In a real factory, operators aren't staring at dashboards; they are on the floor. **Slack** provides an immediate, mobile-friendly interface where the LLM can post a detailed "Investigation Report," allowing for a **Human-in-the-Loop** response to anomalies.
 
 ---
 
@@ -51,6 +105,7 @@ The system is composed of five interconnected pipelines. Each is independent but
 </p>
 
 ---
+
 
 ## 📁 Project Structure
 

@@ -649,8 +649,6 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-      qdrant:
-        condition: service_healthy
     networks:
       - anomaly-detection-network
     restart: unless-stopped

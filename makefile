@@ -233,12 +233,3 @@ help: ## Display this help message
 	@echo "  9. make full-data-flow       # Start producer"
 	@echo ""
 
-
-cd:
-	sudo rm -rf data/offline/streaming_backfill \
-	sudo rm -rf data/entity_df/telemetry_data \
-	sudo rm -rf /tmp/quix_state/ \
-	sudo rm -rf /inference_service/state/ \
-	docker exec -it redpanda_broker rpk topic delete telemetry-data predictions || true \
-	docker exec -it redpanda_broker rpk topic create telemetry-data -p 1 -r 1 \
-	docker exec -it redpanda_broker rpk topic create predictions -p 1 -r 1 \
