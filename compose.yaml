@@ -752,9 +752,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 20s
     depends_on:
       vllm:
+        condition: service_healthy
+      mcp_server:
         condition: service_healthy
     networks:
       - anomaly-detection-network

@@ -30,6 +30,11 @@ redis:6.2-alpine
 | `port` | `6379` | Standard Redis port |
 | `bind` | `0.0.0.0` | Accessible from all containers on the Docker network |
 
+<p align="center">
+  <img src="../../docs/Redis.png" width="1200">
+</p>
+
+
 ## Role in the System
 
 ```
@@ -39,6 +44,8 @@ feast materialize  ──►  Redis  ◄──  streaming push (per window)
                     inference service
                     GET /get-online-features
 ```
+
+
 
 Features enter Redis from two directions: the Airflow-triggered `feast materialize-incremental` (batch) and the streaming service's `POST /push` calls (real-time). The inference service reads them via the Feast HTTP server at `redis:6379`.
 

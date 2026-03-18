@@ -68,6 +68,11 @@ For each telemetry message the `score()` function:
 | `model_uri` | str | MLflow URI of the loaded model |
 | `error` | str | Present only if inference failed |
 
+<p align="center">
+  <img src="../../docs/Redpanda.png" width="1200">
+</p>
+
+
 ## Model Loading
 
 At startup the service:

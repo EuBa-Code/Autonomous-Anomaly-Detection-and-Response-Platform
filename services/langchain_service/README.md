@@ -85,6 +85,10 @@ After the agent finishes, `notify_operator()` posts to the configured Slack webh
 - Silently skipped if `SLACK_WEBHOOK_URL` is not set
 - Errors are logged but never propagate to the caller
 
+<p align="center">
+  <img src="../../docs/Slack.png" width="1200">
+</p>
+
 ## Configuration (`config.py`)
 
 | Variable | Default | Description |

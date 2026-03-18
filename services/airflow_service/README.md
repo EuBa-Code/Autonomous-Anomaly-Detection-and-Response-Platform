@@ -37,6 +37,11 @@ apache/airflow:2.10.2-python3.11
 
 > All packages are constrained against the official Airflow 2.10.2 / Python 3.11 constraints file to prevent version conflicts. `uv` is used instead of `pip` for faster resolution.
 
+<p align="center">
+  <img src="../../docs/AirFlow.png" width="1200">
+</p>
+
+
 ## DAGs
 
 ### 1. `daily_batch_feature_pipeline` — every day at midnight UTC

@@ -394,6 +394,11 @@ make full-data-flow       # 9. Start telemetry data producer
 | LangChain agent | FastAPI | `8010` |
 | Airflow | Web UI | `8081` |
 
+<p align="center">
+  <img src="docs/Slack.png" width="1200">
+</p>
+
+
 ---
 
 ## 📚 Service Documentation
