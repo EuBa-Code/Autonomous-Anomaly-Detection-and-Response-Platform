@@ -466,12 +466,14 @@ Each service has its own README with full details on file structure, configurati
 
 ---
 
-## 📄 License
+## Team
+Developed collaboratively (mob programming) by:
+- Eugenio Barberini
+- Daniele Pio Genovese
+- Denise Tallarita
+- Giuseppe Faraci
 
-This project is licensed under the [MIT License](LICENSE)."" 
-"## Team" 
-"Developed collaboratively (mob programming) by:" 
-"- Eugenio Barberini" 
-"- Daniele Pio Genovese" 
-"- Denise Tallarita" 
-"- Giuseppe Faraci" 
+---
+
+## 📄 License
+This project is licensed under the [MIT License](LICENSE).
