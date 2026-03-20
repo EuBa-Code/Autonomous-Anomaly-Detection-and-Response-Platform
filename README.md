@@ -468,4 +468,10 @@ Each service has its own README with full details on file structure, configurati
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE)."" 
+"## Team" 
+"Developed collaboratively (mob programming) by:" 
+"- Eugenio Barberini" 
+"- Daniele Pio Genovese" 
+"- Denise Tallarita" 
+"- Giuseppe Faraci" 
